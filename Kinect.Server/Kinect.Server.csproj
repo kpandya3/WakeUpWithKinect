@@ -100,7 +100,58 @@
       <Name>Accord.Statistics</Name>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Content Include="Training Data\jj_k\AnkleLeft.xml" />
+    <Content Include="Training Data\jj_k\AnkleRight.xml" />
+    <Content Include="Training Data\jj_k\ElbowLeft.xml" />
+    <Content Include="Training Data\jj_k\ElbowRight.xml" />
+    <Content Include="Training Data\jj_k\FootLeft.xml" />
+    <Content Include="Training Data\jj_k\FootRight.xml" />
+    <Content Include="Training Data\jj_k\HandLeft.xml" />
+    <Content Include="Training Data\jj_k\HandRight.xml" />
+    <Content Include="Training Data\jj_k\HandTipLeft.xml" />
+    <Content Include="Training Data\jj_k\HandTipRight.xml" />
+    <Content Include="Training Data\jj_k\Head.xml" />
+    <Content Include="Training Data\jj_k\HipLeft.xml" />
+    <Content Include="Training Data\jj_k\HipRight.xml" />
+    <Content Include="Training Data\jj_k\KneeLeft.xml" />
+    <Content Include="Training Data\jj_k\KneeRight.xml" />
+    <Content Include="Training Data\jj_k\Neck.xml" />
+    <Content Include="Training Data\jj_k\ShoulderLeft.xml" />
+    <Content Include="Training Data\jj_k\ShoulderRight.xml" />
+    <Content Include="Training Data\jj_k\SpineBase.xml" />
+    <Content Include="Training Data\jj_k\SpineMid.xml" />
+    <Content Include="Training Data\jj_k\SpineShoulder.xml" />
+    <Content Include="Training Data\jj_k\ThumbLeft.xml" />
+    <Content Include="Training Data\jj_k\ThumbRight.xml" />
+    <Content Include="Training Data\jj_k\WristLeft.xml" />
+    <Content Include="Training Data\jj_k\WristRight.xml" />
+    <Content Include="Training Data\jj_t\AnkleLeft.xml" />
+    <Content Include="Training Data\jj_t\AnkleRight.xml" />
+    <Content Include="Training Data\jj_t\ElbowLeft.xml" />
+    <Content Include="Training Data\jj_t\ElbowRight.xml" />
+    <Content Include="Training Data\jj_t\FootLeft.xml" />
+    <Content Include="Training Data\jj_t\FootRight.xml" />
+    <Content Include="Training Data\jj_t\HandLeft.xml" />
+    <Content Include="Training Data\jj_t\HandRight.xml" />
+    <Content Include="Training Data\jj_t\HandTipLeft.xml" />
+    <Content Include="Training Data\jj_t\HandTipRight.xml" />
+    <Content Include="Training Data\jj_t\Head.xml" />
+    <Content Include="Training Data\jj_t\HipLeft.xml" />
+    <Content Include="Training Data\jj_t\HipRight.xml" />
+    <Content Include="Training Data\jj_t\KneeLeft.xml" />
+    <Content Include="Training Data\jj_t\KneeRight.xml" />
+    <Content Include="Training Data\jj_t\Neck.xml" />
+    <Content Include="Training Data\jj_t\ShoulderLeft.xml" />
+    <Content Include="Training Data\jj_t\ShoulderRight.xml" />
+    <Content Include="Training Data\jj_t\SpineBase.xml" />
+    <Content Include="Training Data\jj_t\SpineMid.xml" />
+    <Content Include="Training Data\jj_t\SpineShoulder.xml" />
+    <Content Include="Training Data\jj_t\ThumbLeft.xml" />
+    <Content Include="Training Data\jj_t\ThumbRight.xml" />
+    <Content Include="Training Data\jj_t\WristLeft.xml" />
+    <Content Include="Training Data\jj_t\WristRight.xml" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
