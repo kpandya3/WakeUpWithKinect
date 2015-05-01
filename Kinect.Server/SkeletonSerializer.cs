@@ -56,10 +56,12 @@ namespace Kinect.Server
         /// <param name="mapper">The coordinate mapper.</param>
         /// <param name="mode">Mode (color or depth).</param>
         /// <returns>A JSON representation of the skeletons.</returns>
-        public static string Serialize(this List<Body> skeletons, CoordinateMapper mapper, Mode mode)
+        public static string Serialize(this List<Body> skeletons, CoordinateMapper mapper, Mode mode, out Dictionary<JointType, Point> jointPoints)
         {
-            JSONSkeletonCollection jsonSkeletons = new JSONSkeletonCollection { Skeletons = new List<JSONSkeleton>() };
+            jointPoints = new Dictionary<JointType, Point>();// convert the joint points to depth (display) space
 
+            JSONSkeletonCollection jsonSkeletons = new JSONSkeletonCollection { Skeletons = new List<JSONSkeleton>() };
+            
             foreach (var skeleton in skeletons)
             {
                 JSONSkeleton jsonSkeleton = new JSONSkeleton
@@ -73,8 +75,8 @@ namespace Kinect.Server
                     case Mode.Body:
                         IReadOnlyDictionary<JointType, Joint> joints = skeleton.Joints;
 
-                        // convert the joint points to depth (display) space
-                        Dictionary<JointType, Point> jointPoints = new Dictionary<JointType, Point>();
+                        
+                        jointPoints = new Dictionary<JointType, Point>();
 
                         foreach (JointType jointType in joints.Keys)
                         {
@@ -101,7 +103,6 @@ namespace Kinect.Server
                     default:
                         break;
                 }
-
 
                 jsonSkeletons.Skeletons.Add(jsonSkeleton);
             }

@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -24,10 +26,10 @@ namespace Kinect.Server
     class Program
     {
         // Define a static logger variable so that it references the
-        // Logger instance named "MyApp".
-         static readonly ILog log = LogManager.GetLogger(typeof(Program));
+        // Logger instance named "Program".
+        static readonly ILog log = LogManager.GetLogger(typeof(Program));
 
-        static List<IWebSocketConnection> _clients = new List<IWebSocketConnection>();
+        static List<IWebSocketConnection> clients = new List<IWebSocketConnection>();
 
         #region kinect related
         static Mode mode = Mode.Body;
@@ -62,13 +64,16 @@ namespace Kinect.Server
         #endregion
 
         #region hmm and exercise recognition related
+        static List<List<Point>> observationSequences; //list of all sequences for all joints
         static List<Database> databases; //each database object corresponds to observation sequence of a joint for (possibly many) labels
+        static String saveDirPath;
         static String[] filenames; //filenames of joints correspond to jointNames (ex: LeftAnkle.xml)
         static List<HiddenMarkovClassifier<MultivariateNormalDistribution>> hmms; //1 hmm per joint
         static int numJoints = Enum.GetNames(typeof(JointType)).Length; //Kinect v2.0 detects 25 joints in a body
-
-        /* for num of frames comparison */
         static Dictionary<String, double> avgFramesPerLabel_Training;
+        static Boolean captureStarted = false; //dictates whethere or not to save incoming frames as part of the sequence
+        static Boolean training = true;
+        static List<String> exercisesToMonitor; 
         #endregion
 
         static void Main(string[] args)
@@ -80,23 +85,24 @@ namespace Kinect.Server
             InitializeKinect();
             InitializeHmms();
 
+            //type anything to quit :) its a feature ;)
             Console.ReadLine();
         }
 
         static void InitializeConnection()
         {
             var server = new WebSocketServer("ws://localhost:8185");
-
+            log.Debug("server started? " + server);
             server.Start(socket =>
             {
                 socket.OnOpen = () =>
                 {
-                    _clients.Add(socket);
+                    clients.Add(socket);
                 };
 
                 socket.OnClose = () =>
                 {
-                    _clients.Remove(socket);
+                    clients.Remove(socket);
                 };
 
                 socket.OnMessage = message =>
@@ -107,6 +113,8 @@ namespace Kinect.Server
                             break;
                     }                    
                 };
+
+                
             });
         }
 
@@ -199,11 +207,21 @@ namespace Kinect.Server
                     var users = bodies.Where(s => s.IsTracked).ToList();
                     if (users.Count > 0)
                     {
-                        String json = users.Serialize(coordinateMapper, mode);
-                        foreach (var socket in _clients)
+                        Dictionary<JointType, Point> jointPoints;                        
+                        String json = users.Serialize(coordinateMapper, mode, out jointPoints);                        
+                        foreach (var socket in clients)
                         {
                             socket.Send(json);
                         }
+
+                        if (captureStarted)
+                        {
+                            //Add all joint locations to observationSequences
+                            for (int i = 0; i < observationSequences.Count; i++)
+                            {
+                                observationSequences[i].Add(jointPoints[((JointType)i)]);
+                            }
+                        }                        
                     }
                 }
             }
@@ -318,10 +336,12 @@ namespace Kinect.Server
                 {
                     case "START":
                         log.Info("START voice command received");
+                        startCapture();
                         break;
 
                     case "STOP":
                         log.Info("STOP voice command received");
+                        stopCapture();                        
                         break;
                 }
             }
@@ -329,18 +349,193 @@ namespace Kinect.Server
 
         static void InitializeHmms()
         {
+            saveDirPath = new Uri(Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().CodeBase), Constants.TRAINING_DATA_DIR)).LocalPath;            
+            observationSequences = new List<List<Point>>(); //store locations all points for all joints for an observation
             databases = new List<Database>();
             filenames = new String[numJoints];
-            hmms = new List<HiddenMarkovClassifier<MultivariateNormalDistribution>>();
+            hmms = new List<HiddenMarkovClassifier<MultivariateNormalDistribution>>();            
+            Directory.CreateDirectory(saveDirPath); //create dir if it doesn't already exist
+
             for (int i = 0; i < numJoints; i++)
             {
-                filenames[i] = ((JointType)i).ToString() + ".xml";
+                observationSequences.Add(new List<Point>());
+                filenames[i] = ((JointType)i).ToString() + ".xml"; //initialize file names
                 hmms.Add(null);
                 databases.Add(new Database());
             }
+
+            //if there are files in the saveDirPath, load all the files
+            
+            if (Directory.GetFiles(saveDirPath, "*", SearchOption.TopDirectoryOnly).Length == filenames.Length){
+                loadDatabases();
+            }
+            else
+            {
+                log.Warn("No files in " + saveDirPath + "! Have you trained yet?");
+            }
+            
+            //initialize dictionary of average number of frames per each unique training label
             avgFramesPerLabel_Training = new Dictionary<String, double>();
+
+            exercisesToMonitor = new List<String>();
         }
-    
+
+        /**
+         * Load observation sequences for each joint file
+         */
+        static void loadDatabases()
+        {
+            String currFilePath = "";
+            for (int i = 0; i < numJoints; i++)
+            {                                
+                currFilePath = Path.Combine(saveDirPath, Path.GetFileName(filenames[i]));
+                databases[i].Load(new FileStream(currFilePath, FileMode.Open)); //load databases if training data already exists                
+            }
+            avgFramesPerLabel_Training = databases[0].avgFramesPerLabel();
+        }
+
+        /// <summary>
+        /// Set capturing flag to true so that kinect frames are saved
+        /// </summary>
+        static void startCapture()
+        {
+            captureStarted = true;
+        }
+
+        /// <summary>
+        /// Stop saving kinect frames. If training mode is on, simply keep the observations and wait for client to tell us what to do with is
+        /// If testing, check if the observations represent exercise
+        /// </summary>
+        static void stopCapture()
+        {
+            captureStarted = false;
+            if (!training){
+                //monitor exercises. 
+                checkForExercises();
+                clearObservations();
+            }
+        }
+
+        static void checkForExercises()
+        {
+            if (exercisesToMonitor.Count > 0){
+                String currExc = exercisesToMonitor.ElementAt(0);               
+
+                if (exerciseFound(currExc))
+                {
+                    exercisesToMonitor.RemoveAt(0);
+                    //TODO: send acknoledgement to client?
+                }
+            }
+        }
+
+        /// <summary>
+        /// Does hmm comput to see if exercise was found or not
+        /// </summary>
+        /// <param name="exerciseToCheck"></param>
+        /// <returns></returns>
+        static Boolean exerciseFound(String exerciseToCheck)
+        {
+            return false;
+        }
+
+        /// <summary>
+        /// Reset observation sequences so can capture the next set of data
+        /// </summary>
+        static void clearObservations()
+        {
+            observationSequences.Clear();
+        }
+
+        static void learnHmms(){
+            kinectSensor.Close();
+            for (int i = 0; i < databases.Count; i++)
+            {
+                hmms[i] = learnHMM(databases[i]);
+               log.Debug("done learning hmm for joint: " + i + " : " + Enum.GetName(typeof(JointType), i)); 
+            }
+            kinectSensor.Open();
+        }
+
+        static HiddenMarkovClassifier<MultivariateNormalDistribution> learnHMM(Database database)
+        {
+
+            BindingList<Sequence> samples = database.Samples;
+            BindingList<String> classes = database.Classes;
+
+            double[][][] inputs = new double[samples.Count][][];
+            int[] outputs = new int[samples.Count];
+
+            for (int i = 0; i < inputs.Length; i++)
+            {
+                inputs[i] = samples[i].Input;
+                outputs[i] = samples[i].Output;
+            }
+
+            int states = 5;
+            int iterations = 0;
+            double tolerance = 0.1;
+            bool rejection = true;
+
+
+            HiddenMarkovClassifier<MultivariateNormalDistribution> hmm = new HiddenMarkovClassifier<MultivariateNormalDistribution>(classes.Count,
+                new Forward(states), new MultivariateNormalDistribution(2), classes.ToArray());
+
+            // Create the learning algorithm for the ensemble classifier
+            var teacher = new HiddenMarkovClassifierLearning<MultivariateNormalDistribution>(hmm,
+
+                // Train each model using the selected convergence criteria
+                i => new BaumWelchLearning<MultivariateNormalDistribution>(hmm.Models[i])
+                {
+                    Tolerance = tolerance,
+                    Iterations = iterations,
+
+                    FittingOptions = new NormalOptions()
+                    {
+                        Regularization = 1e-5
+                    }
+                }
+            );
+
+            teacher.Empirical = true;
+            teacher.Rejection = rejection;
+
+
+            // Run the learning algorithm
+            double error = teacher.Run(inputs, outputs);
+
+            // Classify all training instances
+            foreach (var sample in database.Samples)
+            {
+                sample.RecognizedAs = hmm.Compute(sample.Input);
+            }
+
+            return hmm;
+        }
+
+        static void addExercise(String label)
+        {
+            for (int i = 0; i < databases.Count; i++)
+            {
+                databases[i].Add(observationSequences[i].ToArray(), label);               
+            }
+            avgFramesPerLabel_Training = databases[0].avgFramesPerLabel();
+            clearObservations();
+        }
+
+        /// <summary>
+        /// save training joint sample to files
+        /// </summary>
+        static void saveDatabases()
+        {            
+            String path;
+            for (int i = 0; i < databases.Count; i++)
+            {
+                path = Path.Combine(saveDirPath, Path.GetFileName(filenames[i]));
+                using (var stream = File.OpenWrite(path))
+                    databases[i].Save(stream);
+            }
+        }
     }
 
 }

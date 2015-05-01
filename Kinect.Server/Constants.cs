@@ -47,5 +47,7 @@ namespace Kinect.Server
         /// Constant for clamping Z values of camera space points from being negative
         /// </summary>
         public static float InferredZPositionClamp = 0.1f;
+
+        public static string TRAINING_DATA_DIR = "Training Data";
     }
 }
