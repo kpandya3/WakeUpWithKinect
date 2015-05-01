@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Media;
 using System.Runtime.InteropServices;
 using System.Text;
 using Fleck;
@@ -76,6 +77,8 @@ namespace Kinect.Server
         static Boolean training = false;
         static List<String> exercisesToMonitor;
         static Boolean alarmRinging = false;
+        static SoundPlayer player = new SoundPlayer(Properties.Resources.clockBuzzer);
+        static System.Threading.Timer timer;
         #endregion
 
         static void test()
@@ -135,7 +138,7 @@ namespace Kinect.Server
         /// <param name="json"></param>
         static void broadcastMessage(String json)
         {
-            foreach (IWebSocketConnection socket in clients)
+            foreach (var socket in clients)
             {
                 socket.Send(json);
             }
@@ -231,18 +234,7 @@ namespace Kinect.Server
                     if (users.Count > 0)
                     {
                         // prepare data to send for JSON serialization. In particular, send skeleton data, frameCount, avgFrameCountForCurrExc, and list of remaining exercises
-                        Dictionary<JointType, Point> jointPoints; 
-                        int frameCount = observationSequences[0].Count();
-                        double avgFramesForCurrExc = 0;
-                        if (exercisesToMonitor.Count() > 0)
-                        {
-                            avgFramesForCurrExc = avgFramesPerLabel_Training[exercisesToMonitor.ElementAt(0)];
-                        }
-                        String json = users.Serialize(coordinateMapper, mode, alarmRinging, avgFramesForCurrExc, frameCount, exercisesToMonitor, out jointPoints);
-                        foreach (var socket in clients)
-                        {
-                            socket.Send(json);
-                        }
+                        Dictionary<JointType, Point> jointPoints = getJointPoints(users, coordinateMapper);                         
 
                         if (captureStarted)
                         {
@@ -253,11 +245,61 @@ namespace Kinect.Server
                             }
 
                             //if not training, then in testing => check for exercise
-                            checkForExercises();
-                        }                        
+                            if (!training)
+                            {
+                                checkForExercises();
+                            }                            
+                        }
+
+                        sendSkeletonAndExerciseData(users[0], jointPoints);
+
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Send data to the client home page about location of joints for currently tracked skeleton, as well as state of current exercise being monitored
+        /// </summary>
+        /// <param name="skeleton"></param>
+        /// <param name="jointPoints"></param>
+        private static void sendSkeletonAndExerciseData(Body skeleton, Dictionary<JointType, Point> jointPoints)
+        {
+            int frameCount = observationSequences[0].Count();
+            double avgFramesForCurrExc = 0;
+            if (exercisesToMonitor.Count() > 0)
+            {
+                avgFramesForCurrExc = avgFramesPerLabel_Training[exercisesToMonitor.ElementAt(0)];
+            }
+            String json = DefaultSerializer.SerializeHomePageData(skeleton, jointPoints, alarmRinging, avgFramesForCurrExc, frameCount, exercisesToMonitor);
+            broadcastMessage(json);
+        }
+
+        /// <summary>
+        /// For the body frame of the first tracked skeleton, get a dictionary of all jointTypes and their corresponding currentPoint
+        /// </summary>
+        /// <param name="skeletons"></param>
+        /// <param name="mapper"></param>
+        /// <returns></returns>
+        static Dictionary<JointType, Point> getJointPoints(List<Body> skeletons, CoordinateMapper mapper)
+        {
+            Body skeleton = skeletons[0]; //only consider the first tracked skeleton.
+            IReadOnlyDictionary<JointType, Joint> joints = skeleton.Joints;
+            Dictionary<JointType, Point> jointPoints = new Dictionary<JointType, Point>();
+            foreach (JointType jointType in joints.Keys)
+            {
+                // sometimes the depth(Z) of an inferred joint may show as negative
+                // clamp down to 0.1f to prevent coordinatemapper from returning (-Infinity, -Infinity)
+                CameraSpacePoint position = joints[jointType].Position;
+                if (position.Z < 0)
+                {
+                    position.Z = Constants.InferredZPositionClamp;
+                }
+
+                DepthSpacePoint depthSpacePoint = mapper.MapCameraPointToDepthSpace(position);
+                jointPoints[jointType] = new Point((int)depthSpacePoint.X, (int)depthSpacePoint.Y);
+            }
+            return jointPoints;
         }
 
         /// <summary>
@@ -353,13 +395,7 @@ namespace Kinect.Server
         static void SpeechRecognized(object sender, SpeechRecognizedEventArgs e)
         {
             // Speech utterance confidence below which we treat speech as if it hadn't been heard
-            const double ConfidenceThreshold = 0.3;
-
-            // Number of degrees in a right angle.
-            const int DegreesInRightAngle = 90;
-
-            // Number of pixels turtle should move forwards or backwards each time.
-            const int DisplacementAmount = 60;
+            const double ConfidenceThreshold = 0.3;           
 
             // this.ClearRecognitionHighlights();
 
@@ -625,12 +661,35 @@ namespace Kinect.Server
         {            
             String path;
             for (int i = 0; i < databases.Count; i++)
-            {
+            {                
                 path = Path.Combine(saveDirPath, Path.GetFileName(filenames[i]));
-                using (var stream = File.OpenWrite(path))
+                log.Debug("Saving database to path: " + path);
+                //using (var stream = File.OpenWrite(path))
+                using (var stream = File.Create(path))
                     databases[i].Save(stream);
             }
         }
-    }
 
+        /// <summary>
+        /// Set Timer based on timespan parameter
+        /// </summary>
+        /// <param name="ts"></param>
+        static void setAlarm(TimeSpan ts)
+        {
+            if (timer != null) timer.Dispose();
+            if (ts.TotalSeconds > 0) timer = new System.Threading.Timer(new System.Threading.TimerCallback(ringAlarm), null, ts, TimeSpan.FromHours(24));
+        }
+
+        /// <summary>
+        /// Callback for when timer reaches target time
+        /// Ring the alarm, set alarmRinging to true, and notify clients
+        /// </summary>
+        /// <param name="state"></param>
+        static void ringAlarm(object state)
+        {
+            log.Info("RING! RING!");
+            player.Play();
+            alarmRinging = true;
+        }
+    }
 }
