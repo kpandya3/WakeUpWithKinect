@@ -28,6 +28,7 @@ namespace Kinect.Server
         // Define a static logger variable so that it references the
         // Logger instance named "Program".
         static readonly ILog log = LogManager.GetLogger(typeof(Program));
+        static Boolean debugging = true;
 
         static List<IWebSocketConnection> clients = new List<IWebSocketConnection>();
 
@@ -72,9 +73,18 @@ namespace Kinect.Server
         static int numJoints = Enum.GetNames(typeof(JointType)).Length; //Kinect v2.0 detects 25 joints in a body
         static Dictionary<String, double> avgFramesPerLabel_Training;
         static Boolean captureStarted = false; //dictates whethere or not to save incoming frames as part of the sequence
-        static Boolean training = true;
-        static List<String> exercisesToMonitor; 
+        static Boolean training = false;
+        static List<String> exercisesToMonitor;
+        static Boolean alarmRinging = false;
         #endregion
+
+        static void test()
+        {
+            if (debugging)
+            {
+                exercisesToMonitor.Add("jj");
+            }
+        }
 
         static void Main(string[] args)
         {
@@ -84,6 +94,7 @@ namespace Kinect.Server
             InitializeConnection();
             InitializeKinect();
             InitializeHmms();
+            test();
 
             //type anything to quit :) its a feature ;)
             Console.ReadLine();
@@ -91,7 +102,7 @@ namespace Kinect.Server
 
         static void InitializeConnection()
         {
-            var server = new WebSocketServer("ws://localhost:8185");
+            var server = new WebSocketServer("ws://0.0.0.0:8185");
             log.Debug("server started? " + server);
             server.Start(socket =>
             {
@@ -116,6 +127,18 @@ namespace Kinect.Server
 
                 
             });
+        }
+
+        /// <summary>
+        /// Send json message across to all the websocket clients
+        /// </summary>
+        /// <param name="json"></param>
+        static void broadcastMessage(String json)
+        {
+            foreach (IWebSocketConnection socket in clients)
+            {
+                socket.Send(json);
+            }
         }
 
         static void InitializeKinect()
@@ -207,8 +230,15 @@ namespace Kinect.Server
                     var users = bodies.Where(s => s.IsTracked).ToList();
                     if (users.Count > 0)
                     {
-                        Dictionary<JointType, Point> jointPoints;                        
-                        String json = users.Serialize(coordinateMapper, mode, out jointPoints);                        
+                        // prepare data to send for JSON serialization. In particular, send skeleton data, frameCount, avgFrameCountForCurrExc, and list of remaining exercises
+                        Dictionary<JointType, Point> jointPoints; 
+                        int frameCount = observationSequences[0].Count();
+                        double avgFramesForCurrExc = 0;
+                        if (exercisesToMonitor.Count() > 0)
+                        {
+                            avgFramesForCurrExc = avgFramesPerLabel_Training[exercisesToMonitor.ElementAt(0)];
+                        }
+                        String json = users.Serialize(coordinateMapper, mode, alarmRinging, avgFramesForCurrExc, frameCount, exercisesToMonitor, out jointPoints);
                         foreach (var socket in clients)
                         {
                             socket.Send(json);
@@ -221,6 +251,9 @@ namespace Kinect.Server
                             {
                                 observationSequences[i].Add(jointPoints[((JointType)i)]);
                             }
+
+                            //if not training, then in testing => check for exercise
+                            checkForExercises();
                         }                        
                     }
                 }
@@ -364,19 +397,16 @@ namespace Kinect.Server
                 databases.Add(new Database());
             }
 
-            //if there are files in the saveDirPath, load all the files
-            
+            //if there are files in the saveDirPath, load all the files            
             if (Directory.GetFiles(saveDirPath, "*", SearchOption.TopDirectoryOnly).Length == filenames.Length){
                 loadDatabases();
+                log.Debug("loaded training data from all joints");
             }
             else
             {
                 log.Warn("No files in " + saveDirPath + "! Have you trained yet?");
             }
             
-            //initialize dictionary of average number of frames per each unique training label
-            avgFramesPerLabel_Training = new Dictionary<String, double>();
-
             exercisesToMonitor = new List<String>();
         }
 
@@ -391,7 +421,12 @@ namespace Kinect.Server
                 currFilePath = Path.Combine(saveDirPath, Path.GetFileName(filenames[i]));
                 databases[i].Load(new FileStream(currFilePath, FileMode.Open)); //load databases if training data already exists                
             }
+
+            //set average frames per label dictionary
             avgFramesPerLabel_Training = databases[0].avgFramesPerLabel();
+
+            //training data has been loaded, now learn the HMM models for each joint in training data
+            learnHmms();
         }
 
         /// <summary>
@@ -404,14 +439,12 @@ namespace Kinect.Server
 
         /// <summary>
         /// Stop saving kinect frames. If training mode is on, simply keep the observations and wait for client to tell us what to do with is
-        /// If testing, check if the observations represent exercise
+        /// If testing, clear observations.
         /// </summary>
         static void stopCapture()
         {
             captureStarted = false;
             if (!training){
-                //monitor exercises. 
-                checkForExercises();
                 clearObservations();
             }
         }
@@ -420,12 +453,17 @@ namespace Kinect.Server
         {
             if (exercisesToMonitor.Count > 0){
                 String currExc = exercisesToMonitor.ElementAt(0);               
-
+                log.Debug("Checking for exercise" +currExc+ "in the current sequence");
                 if (exerciseFound(currExc))
                 {
+                    log.Debug(currExc + " found! Removing it from list of exercises to monitor. \n DO A DANCE NOW???");
                     exercisesToMonitor.RemoveAt(0);
+                    stopCapture();
                     //TODO: send acknoledgement to client?
                 }
+            }
+            else{
+                log.Warn("there were no exercises to monitor!");
             }
         }
 
@@ -436,6 +474,63 @@ namespace Kinect.Server
         /// <returns></returns>
         static Boolean exerciseFound(String exerciseToCheck)
         {
+            if (!avgFramesPerLabel_Training.ContainsKey(exerciseToCheck)){
+                log.Error("Invalid exercise name! " + exerciseToCheck + " not found in average frames per label dictionary");
+                return false;
+            }
+
+            // only consider exercises if the number of frames are within a threshold
+            double frameCount = observationSequences[0].Count();
+            double avgFrameCountForExc = avgFramesPerLabel_Training[exerciseToCheck] ;
+            double frameDifference = avgFrameCountForExc - frameCount;
+            double frameThreshold = avgFrameCountForExc + Convert.ToInt32(Math.Ceiling(avgFrameCountForExc * Constants.FRAME_THRESHOLD_PERCENT));
+            if (Math.Abs(frameDifference) > frameThreshold)
+            {
+                return false;
+            }
+            if (debugging)
+            {
+                log.Debug("Frames DIfference is: " + frameDifference + ". avg grames for exercise: " + exerciseToCheck + " is: " + avgFrameCountForExc + ". Frames Threshold is " + frameThreshold);
+            }
+            
+            //prepare for hmm computations
+            double[][][] inputs = new Double[numJoints][][];
+            for (int i = 0; i < numJoints; i++)
+            {
+                inputs[i] = Sequence.Preprocess(observationSequences[i].ToArray());
+            }
+
+            //do hmm computation to find closest exercise match for each joint
+            String[] outputLabels = new String[inputs.Length];
+            String label;
+            for (int i = 0; i < inputs.Length; i++)
+            {
+                int index = hmms[i].Compute(inputs[i]);
+                label = (index >= 0) ? databases[i].Classes[index] : "NOT FOUND";
+                outputLabels[i] = label;
+            }
+
+            //determine if exercise is done by analyzing evidence in each joint for the given exercise
+            if (outputLabels.Any(x => x != "NOT FOUND"))
+            {
+                //return most occuring exercise label by considering labels for all the joints
+                label = outputLabels.Where(x => x != "NOT FOUND").GroupBy(x => x).OrderByDescending(x => x.Count()).First().Key;
+                int numLabels = outputLabels.Where(x => x == label).Count();
+
+                if (numLabels < Constants.MIN_NUM_MATCHED_JOINTS)
+                {
+                    label = "NOT FOUND";
+                }
+            }
+            else
+            {
+                label = "NOT FOUND";
+            }
+
+            if (label == exerciseToCheck)
+            {
+                return true;
+            }
             return false;
         }
 

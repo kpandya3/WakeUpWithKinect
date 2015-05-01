@@ -11,7 +11,7 @@
     status.innerHTML = "Connecting to server...";
 
     // Initialize a new web socket.
-    var socket = new WebSocket("ws://192.168.0.16:8185");
+    var socket = new WebSocket("ws://127.0.0.1:8185");
 
     // Connection established.
     socket.onopen = function () {

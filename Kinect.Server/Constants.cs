@@ -48,6 +48,16 @@ namespace Kinect.Server
         /// </summary>
         public static float InferredZPositionClamp = 0.1f;
 
+        /// <summary>
+        /// Name of folder where training data will be stored
+        /// </summary>
         public static string TRAINING_DATA_DIR = "Training Data";
+
+        /// <summary>
+        /// percent of avg frames to use as threshold increment
+        /// </summary>
+        public static double FRAME_THRESHOLD_PERCENT = 0.15;
+
+        public static int MIN_NUM_MATCHED_JOINTS = 5;
     }
 }

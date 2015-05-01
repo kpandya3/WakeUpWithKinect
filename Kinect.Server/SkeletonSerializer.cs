@@ -14,13 +14,25 @@ namespace Kinect.Server
     /// <summary>
     /// Serializes a Kinect skeleton to JSON fromat.
     /// </summary>
-    public static class SkeletonSerializer
+    public static class DefaultSerializer
     {
         [DataContract]
-        class JSONSkeletonCollection
+        class JSONDefaultCollection
         {
             [DataMember(Name = "skeletons")]
             public List<JSONSkeleton> Skeletons { get; set; }
+
+            [DataMember(Name = "alarmOn")]
+            public Boolean AlarmOn { get; set; }
+
+            [DataMember(Name = "avgFrames")]
+            public double AvgFrames { get; set; }
+
+            [DataMember(Name = "currFrames")]
+            public int CurrFrames { get; set; }
+
+            [DataMember(Name = "excRemaining")]
+            public List<String> ExcRemaining { get; set; }
         }
 
         [DataContract]
@@ -49,6 +61,8 @@ namespace Kinect.Server
             public double Z { get; set; }
         }
 
+        
+        
         /// <summary>
         /// Serializes an array of Kinect skeletons into an array of JSON skeletons.
         /// </summary>
@@ -56,11 +70,11 @@ namespace Kinect.Server
         /// <param name="mapper">The coordinate mapper.</param>
         /// <param name="mode">Mode (color or depth).</param>
         /// <returns>A JSON representation of the skeletons.</returns>
-        public static string Serialize(this List<Body> skeletons, CoordinateMapper mapper, Mode mode, out Dictionary<JointType, Point> jointPoints)
+        public static string Serialize(this List<Body> skeletons, CoordinateMapper mapper, Mode mode, Boolean alarmOn, double avgFrames, int currFrames, List<String> excRemaining, out Dictionary<JointType, Point> jointPoints)
         {
             jointPoints = new Dictionary<JointType, Point>();// convert the joint points to depth (display) space
 
-            JSONSkeletonCollection jsonSkeletons = new JSONSkeletonCollection { Skeletons = new List<JSONSkeleton>() };
+            JSONDefaultCollection jsonSkeletons = new JSONDefaultCollection { Skeletons = new List<JSONSkeleton>(), AlarmOn=alarmOn, AvgFrames=avgFrames, CurrFrames=currFrames, ExcRemaining=excRemaining };
             
             foreach (var skeleton in skeletons)
             {
