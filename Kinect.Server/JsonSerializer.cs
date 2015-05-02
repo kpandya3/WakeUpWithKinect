@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.IO;
+using System.Json;
 using System.Text;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
@@ -14,7 +15,7 @@ namespace Kinect.Server
     /// <summary>
     /// Serializes messages to clients to JSON fromat.
     /// </summary>
-    public static class DefaultSerializer
+    public static class JsonSerializerHomePage
     {
         #region protocol for home page - when alarm rings
         [DataContract]
@@ -73,7 +74,6 @@ namespace Kinect.Server
         }
         #endregion
 
-
         public static string SerializeHomePageData(Body skeleton, Dictionary<JointType, Point> jointPoints, Boolean alarmOn, double avgFrames, int currFrames, List<String> excRemaining)
         {
             JSONSkeleton jsonSkeleton = new JSONSkeleton
@@ -103,12 +103,12 @@ namespace Kinect.Server
 
             JSONHomePage jsonHomePage = new JSONHomePage{
                 Page = "home",
-                Operation = "test",
+                Operation = "default",
                 Data = jsonHomePageData
             };
 
 
-            return Serialize(jsonHomePageData);
+            return Serialize(jsonHomePage);
         }
 
         /// <summary>

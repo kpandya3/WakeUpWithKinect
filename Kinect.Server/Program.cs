@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.IO;
+using System.Json;
 using System.Linq;
 using System.Media;
 using System.Runtime.InteropServices;
@@ -11,6 +12,7 @@ using Fleck;
 using Microsoft.Kinect;
 using Microsoft.Speech.AudioFormat;
 using Microsoft.Speech.Recognition;
+using Newtonsoft.Json;
 using Accord.Statistics.Distributions.Fitting;
 using Accord.Statistics.Distributions.Multivariate;
 using Accord.Statistics.Models.Fields;
@@ -74,11 +76,12 @@ namespace Kinect.Server
         static int numJoints = Enum.GetNames(typeof(JointType)).Length; //Kinect v2.0 detects 25 joints in a body
         static Dictionary<String, double> avgFramesPerLabel_Training;
         static Boolean captureStarted = false; //dictates whethere or not to save incoming frames as part of the sequence
-        static Boolean training = false;
+        static Boolean training = true;
         static List<String> exercisesToMonitor;
         static Boolean alarmRinging = false;
         static SoundPlayer player = new SoundPlayer(Properties.Resources.clockBuzzer);
         static System.Threading.Timer timer;
+        static DateTime alarmDateTime;
         #endregion
 
         static void test()
@@ -86,6 +89,10 @@ namespace Kinect.Server
             if (debugging)
             {
                 exercisesToMonitor.Add("jj");
+                exercisesToMonitor.Add("jj");
+                exercisesToMonitor.Add("jj");
+                exercisesToMonitor.Add("jj22");
+                exercisesToMonitor.Add("jj22");
             }
         }
 
@@ -121,15 +128,83 @@ namespace Kinect.Server
 
                 socket.OnMessage = message =>
                 {
-                    switch (message)
-                    {                       
+                    log.Debug("RECEIVED: " + message);
+                    JsonValue jsonMessage = JsonValue.Parse(message);
+                    String page = (string)jsonMessage["page"];
+                    String operation;
+                    switch (page)
+                    {       
+                        case "home":
+                            operation = (string)jsonMessage["operation"];
+                            if (operation == "mode")
+                            {
+                                training = false;
+                                log.Debug("training is set to " + training);
+                            }
+                            break;
+                        case "train":
+                            operation = (string)jsonMessage["operation"];
+                            switch (operation)
+                            {
+                                case "accept":
+                                    String label = (string)jsonMessage["data"]["label"];
+                                    addExercise(label);
+                                    break;
+                                case "reject":
+                                    log.Debug("length of obs sequences before rejecting " + observationSequences[0].Count());
+                                    clearObservations();
+                                    log.Debug("length of obs sequences before rejecting " + observationSequences[0].Count());
+                                    break;
+                                case "train":
+                                    learnHmms();
+                                    break;
+                                case "mode":
+                                    training = true;
+                                    log.Debug("training is set to " + training);
+                                    break;
+                                case "labels":
+                                    if (avgFramesPerLabel_Training != null && avgFramesPerLabel_Training.Count() > 0)
+                                    {
+                                        List<String> labels = new List<string>(avgFramesPerLabel_Training.Keys);
+                                        String data = JsonConvert.SerializeObject(labels);
+                                        broadcastMessage(createJsonString(page, operation, data));
+                                    }                                    
+                                    break;
+                                default:
+                                    break;
+                            }
+                            break;
+                        case "options":
+                            int hours = Convert.ToInt32((string)jsonMessage["data"]["hour"]);
+                            int minutes = Convert.ToInt32((string)jsonMessage["data"]["minute"]);
+                            DateTime now = DateTime.Now;
+                            alarmDateTime = new DateTime(now.Year, now.Month, now.Day, hours, minutes, 0);
+                            log.Debug("alarmDateTime set to " + alarmDateTime);
+                            setAlarm(alarmDateTime.TimeOfDay - now.TimeOfDay);
+                            log.Debug("setting alarm");
+                            
+                            String excsRecd = (string)jsonMessage["data"]["exc"];
+                            exercisesToMonitor = excsRecd.Split('|').ToList();
+                            log.Debug("exercisesToMonitor set to " + exercisesToMonitor);
+                            break;
                         default:
                             break;
-                    }                    
+                    }
                 };
-
-                
             });
+        }
+
+        public static DateTime UnixTimeStampToDateTime(double unixTimeStamp)
+        {
+            System.DateTime dtDateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0);
+            dtDateTime = dtDateTime.AddSeconds(unixTimeStamp);
+            return dtDateTime;
+        }
+
+        static String createJsonString(String page, String operation, String data)
+        {
+            String json = "{\"page\":\"" + page + "\",\"operation\":\"" + operation + "\",\"data\":" + data + "}";
+            return json;
         }
 
         /// <summary>
@@ -140,6 +215,7 @@ namespace Kinect.Server
         {
             foreach (var socket in clients)
             {
+                //log.Debug("SENDING: " + json);
                 socket.Send(json);
             }
         }
@@ -234,7 +310,7 @@ namespace Kinect.Server
                     if (users.Count > 0)
                     {
                         // prepare data to send for JSON serialization. In particular, send skeleton data, frameCount, avgFrameCountForCurrExc, and list of remaining exercises
-                        Dictionary<JointType, Point> jointPoints = getJointPoints(users, coordinateMapper);                         
+                        Dictionary<JointType, Point> jointPoints = getJointPoints(users, coordinateMapper);
 
                         if (captureStarted)
                         {
@@ -248,14 +324,24 @@ namespace Kinect.Server
                             if (!training)
                             {
                                 checkForExercises();
-                            }                            
+                            }
+
+                            sendSkeletonAndExerciseData(users[0], jointPoints);
                         }
 
-                        sendSkeletonAndExerciseData(users[0], jointPoints);
-
+                        if (alarmRinging==true && exercisesToMonitor.Count() == 0)
+                        {
+                            stopAlarm();
+                        }
                     }
                 }
             }
+        }
+
+        static void stopAlarm()
+        {
+            alarmRinging = false;
+            player.Stop();
         }
 
         /// <summary>
@@ -265,13 +351,17 @@ namespace Kinect.Server
         /// <param name="jointPoints"></param>
         private static void sendSkeletonAndExerciseData(Body skeleton, Dictionary<JointType, Point> jointPoints)
         {
-            int frameCount = observationSequences[0].Count();
+            int frameCount = observationSequences.Count > 0 ? observationSequences[0].Count() : 0;
             double avgFramesForCurrExc = 0;
             if (exercisesToMonitor.Count() > 0)
             {
-                avgFramesForCurrExc = avgFramesPerLabel_Training[exercisesToMonitor.ElementAt(0)];
+                if (avgFramesPerLabel_Training != null)
+                {
+                    avgFramesForCurrExc = avgFramesPerLabel_Training.ContainsKey(exercisesToMonitor.ElementAt(0)) ? avgFramesPerLabel_Training[exercisesToMonitor.ElementAt(0)] : 0;
+            
+                }
             }
-            String json = DefaultSerializer.SerializeHomePageData(skeleton, jointPoints, alarmRinging, avgFramesForCurrExc, frameCount, exercisesToMonitor);
+            String json = JsonSerializerHomePage.SerializeHomePageData(skeleton, jointPoints, alarmRinging, avgFramesForCurrExc, frameCount, exercisesToMonitor);
             broadcastMessage(json);
         }
 
@@ -410,7 +500,10 @@ namespace Kinect.Server
 
                     case "STOP":
                         log.Info("STOP voice command received");
-                        stopCapture();                        
+                        if (training)
+                        {
+                            stopCapture();  
+                        }
                         break;
                 }
             }
@@ -470,15 +563,17 @@ namespace Kinect.Server
         /// </summary>
         static void startCapture()
         {
+            log.Debug("Capture started");
             captureStarted = true;
         }
 
-        /// <summary>
+        /// <summary>l
         /// Stop saving kinect frames. If training mode is on, simply keep the observations and wait for client to tell us what to do with is
         /// If testing, clear observations.
         /// </summary>
         static void stopCapture()
         {
+            log.Debug("Capture stopped");
             captureStarted = false;
             if (!training){
                 clearObservations();
@@ -519,9 +614,14 @@ namespace Kinect.Server
             double frameCount = observationSequences[0].Count();
             double avgFrameCountForExc = avgFramesPerLabel_Training[exerciseToCheck] ;
             double frameDifference = avgFrameCountForExc - frameCount;
-            double frameThreshold = avgFrameCountForExc + Convert.ToInt32(Math.Ceiling(avgFrameCountForExc * Constants.FRAME_THRESHOLD_PERCENT));
+            double frameThreshold = avgFrameCountForExc + Convert.ToInt32(avgFrameCountForExc * Constants.FRAME_THRESHOLD_PERCENT);
+            
             if (Math.Abs(frameDifference) > frameThreshold)
             {
+                if (frameCount > avgFrameCountForExc)
+                {
+                    clearObservations();
+                }
                 return false;
             }
             if (debugging)
@@ -575,7 +675,11 @@ namespace Kinect.Server
         /// </summary>
         static void clearObservations()
         {
-            observationSequences.Clear();
+            for (int i = 0; i < observationSequences.Count(); i++)
+            {
+                observationSequences[i].Clear();
+            }
+                
         }
 
         static void learnHmms(){
@@ -646,12 +750,14 @@ namespace Kinect.Server
 
         static void addExercise(String label)
         {
+            
             for (int i = 0; i < databases.Count; i++)
             {
                 databases[i].Add(observationSequences[i].ToArray(), label);               
             }
             avgFramesPerLabel_Training = databases[0].avgFramesPerLabel();
             clearObservations();
+            log.Debug("added exercises to databases and updated avgFramesPerLabel dict");
         }
 
         /// <summary>
@@ -676,8 +782,10 @@ namespace Kinect.Server
         /// <param name="ts"></param>
         static void setAlarm(TimeSpan ts)
         {
+            log.Debug("setting alarm with timespan: " + ts + "timespan.totalseconds: " + ts.TotalSeconds + "timer is: " + timer);
             if (timer != null) timer.Dispose();
             if (ts.TotalSeconds > 0) timer = new System.Threading.Timer(new System.Threading.TimerCallback(ringAlarm), null, ts, TimeSpan.FromHours(24));
+            log.Debug("timer" + timer + " timespan from hours " + "");
         }
 
         /// <summary>
@@ -690,6 +798,7 @@ namespace Kinect.Server
             log.Info("RING! RING!");
             player.Play();
             alarmRinging = true;
+            startCapture();
         }
     }
 }

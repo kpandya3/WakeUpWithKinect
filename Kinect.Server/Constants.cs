@@ -59,5 +59,7 @@ namespace Kinect.Server
         public static double FRAME_THRESHOLD_PERCENT = 0.15;
 
         public static int MIN_NUM_MATCHED_JOINTS = 5;
+
+        public static String DELIMETER = "||";
     }
 }

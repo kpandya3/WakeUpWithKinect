@@ -8,27 +8,211 @@
     <title>Kinect &amp; HTML5</title>
     <link rel="stylesheet" href="css/style.css" />
     <!-- Bootstrap -->
+    <link href="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="http://brianreavis.github.io/selectize.js/css/selectize.css" rel="stylesheet">
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <link href="css/bootstrap-theme.min.css" rel="stylesheet" />
+    <link rel="stylesheet" type="text/css" href="css/bootstrap-clockpicker.min.css">
+
     <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
     <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
     <!--[if lt IE 9]>
         <script src="js/html5shiv.min.js"></script>
         <script src="js/respond.min.js"></script>
     <![endif]-->
-    <script src="js/script.js"></script>
-</head>
-<body>
-    <div class="container-fluid">
-        <h1>Kinect &amp HTML5 WebSockets</h1>
-        Status: <label id="status">None</label>
-        <canvas id="canvas" width="500" height="500"></canvas>
-    </div>
-    
-
     <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
     <script src="js/jquery.min.js"></script>
     <!-- Include all compiled plugins (below), or include individual files as needed -->
     <script src="js/bootstrap.min.js"></script>
+    <script src="js/bootstrap-clockpicker.min.js"></script>
+    <script src="http://brianreavis.github.io/selectize.js/js/selectize.js"></script>
+    <script src="js/script.js"></script>
+    <script src="js/frontend.js"></script>
+</head>
+
+<body>
+    <!-- START NAV -->
+    <nav class="navbar navbar-default navbar-fixed-top">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar" aria-expanded="true" aria-controls="navbar">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="#">Wake up with Kinect</a>
+        </div>
+        <div id="navbar" class="navbar-collapse collapse in" aria-expanded="true" style="">
+          <ul class="nav navbar-nav">
+            <li class="active gototab"><a href="#">Home</a></li>
+            <li class="gototab"><a href="#">Train</a></li>
+            <li class="gototab"><a href="#">Options</a></li>
+          </ul>
+        </div><!--/.nav-collapse -->
+      </div>
+    </nav>
+    <!-- END NAV -->
+
+
+
+
+
+
+    <!-- HOME PAGE -->
+    <div class="container home page">
+        <div class="row">
+            <div class="col-lg-1 col-md-1 col-sm-1">
+            </div>
+            <div class="col-lg-10 col-md-10 col-sm-10">
+                <h1>Kinect &amp HTML5 WebSockets</h1>
+                Status: <label id="status">None</label>
+            </div>
+            <div class="col-lg-1 col-md-1 col-sm-1">
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-lg-1 col-md-1 col-sm-1">
+            </div>
+            <div class="col-lg-10 col-md-10 col-sm-10">
+                <h3>Alarm will go off in <span id="timeLeft">0:00</span></h3>
+            </div>
+            <div class="col-lg-1 col-md-1 col-sm-1">
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-lg-9 col-md-9 col-sm-9" id="testCanvas">
+                <canvas id="canvas" width="600" height="600"></canvas>
+            </div>
+            <div class="col-lg-3 col-md-3 col-sm-3">
+                <div class="row">
+                    <div class="col-lg-2 col-md-2 col-sm-2"></div>
+                    <div class="col-lg-8 col-md-8 col-sm-8">
+                        <canvas id="countdown" width="160" height="160"></canvas>
+                    </div>
+                    <div class="col-lg-2 col-md-2 col-sm-2"></div>
+                </div>
+                <div class="row">
+                    <table class="table table-striped">
+                        <thead>
+                          <tr>
+                            <th>Exercise</th>
+                            <th>Count</th>
+                          </tr>
+                        </thead>
+                        <tbody id="testExeTable">
+                          <!-- <tr>
+                            <td>John</td>
+                            <td>4</td>
+                          </tr>
+                          <tr>
+                            <td>Mary</td>
+                            <td>6</td>
+                          </tr> -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- END HOME PAGE -->
+
+
+
+
+
+
+    <!-- TRAIN PAGE -->
+    <div class="container train page">
+        <!-- <div class="row" style="padding:30px;"></div> -->
+        <h3>Instructions</h3>
+        <div class="row">
+            <div id="trainCanvas">
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-lg-2 col-md-0 col-sm-0"></div>
+            <div class="col-lg-4 col-md-6 col-sm-6">
+                <select id="select-label" class="demo-default" placeholder="Select an Exercise...">
+                </select>
+            </div>
+            <div class="col-lg-4 col-md-6 col-sm-6">
+                <button type="button" class="btn btn-default" onclick="acceptTraining();">
+                    <span class="glyphicon glyphicon-ok" aria-hidden="true"></span> Accept
+                </button>
+                <button type="button" class="btn btn-default" onclick="rejectTraining();">
+                    <span class="glyphicon glyphicon-remove" aria-hidden="true"></span> Reject
+                </button>
+                <button type="button" class="btn btn-default" onclick="train();">
+                    <span class="glyphicon glyphicon-record" aria-hidden="true"></span> TRAIN
+                </button>
+            </div>
+            <div class="col-lg-2 col-md-0 col-sm-0"></div>
+        </div>
+
+    </div>
+    <!-- END TRAIN PAGE -->
+
+
+
+
+
+    <!-- OPTIONS PAGE -->
+    <div class="container options page">
+        <div class="row" style="padding:30px;"></div>
+        <div class="row">
+            <div class="col-lg-2 col-md-0 col-sm-0"></div>
+            <div class="col-lg-8 col-md-12 col-sm-12">
+                <div class="input-group clockpicker" data-placement="right" data-align="top" data-autoclose="true">
+                    <input type="text" class="form-control" value="09:32">
+                    <span class="input-group-addon">
+                        <span class="glyphicon glyphicon-time"></span>
+                    </span>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-0 col-sm-0"></div>
+        </div>
+        <div class="row" style="padding:10px;"></div>
+        <div class="row clearfix">
+            <div class="col-lg-2 col-md-2 col-sm-0"></div>
+            <div class="col-md-8 column">
+                <table class="table table-bordered table-hover" id="tab_logic">
+                    <thead>
+                        <tr >
+                            <th class="text-center">
+                                Exercise
+                            </th>
+                            <th class="text-center">
+                                Count
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr id='addr0'>
+                            <td>
+                            <input type="text" name='exe0'  placeholder='Exercise' class="form-control"/>
+                            </td>
+                            <td>
+                            <input type="text" name='count0' placeholder='Count' class="form-control"/>
+                            </td>
+                        </tr>
+                        <tr id='addr1'></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="col-lg-2 col-md-2 col-sm-0"></div>
+        </div>
+        <div class="row">
+            <div class="col-lg-4 col-md-4 col-sm-0"></div>
+            <div class="col-lg-4 col-md-4 col-sm-12">
+                <a id="add_row" class="btn btn-default">Add Row</a>
+                <a id='delete_row' class="btn btn-default">Delete Row</a>
+                <a id='save_settings' class="btn btn-default ">Save</a>
+            </div>
+            <div class="col-lg-4 col-md-4 col-sm-0"></div>
+        </div>
+    </div>
+    <!-- END OPTIONS PAGE -->
+
 </body>
 </html>
