@@ -84,18 +84,6 @@ namespace Kinect.Server
         static DateTime alarmDateTime;
         #endregion
 
-        static void test()
-        {
-            if (debugging)
-            {
-                exercisesToMonitor.Add("jj");
-                exercisesToMonitor.Add("jj");
-                exercisesToMonitor.Add("jj");
-                exercisesToMonitor.Add("jj22");
-                exercisesToMonitor.Add("jj22");
-            }
-        }
-
         static void Main(string[] args)
         {
             //log4net: Set up a simple configuration that logs on the console.
@@ -104,7 +92,6 @@ namespace Kinect.Server
             InitializeConnection();
             InitializeKinect();
             InitializeHmms();
-            test();
 
             //type anything to quit :) its a feature ;)
             Console.ReadLine();
@@ -113,7 +100,7 @@ namespace Kinect.Server
         static void InitializeConnection()
         {
             var server = new WebSocketServer("ws://0.0.0.0:8185");
-            log.Debug("server started? " + server);
+            log.Debug("web socket server started " + server);
             server.Start(socket =>
             {
                 socket.OnOpen = () =>
@@ -126,72 +113,83 @@ namespace Kinect.Server
                     clients.Remove(socket);
                 };
 
-                socket.OnMessage = message =>
-                {
-                    log.Debug("RECEIVED: " + message);
-                    JsonValue jsonMessage = JsonValue.Parse(message);
-                    String page = (string)jsonMessage["page"];
-                    String operation;
-                    switch (page)
-                    {       
-                        case "home":
-                            operation = (string)jsonMessage["operation"];
-                            if (operation == "mode")
-                            {
-                                training = false;
-                                log.Debug("training is set to " + training);
-                            }
+                socket.OnMessage = message => { 
+                    messageHandler((string)message, socket); 
+                };
+            });
+        }
+
+        /// <summary>
+        /// Handles messages from client socket
+        /// </summary>
+        /// <param name="message"></param>
+        static void messageHandler(String message, IWebSocketConnection socket){
+           
+            log.Debug("RECEIVED message from client: " + socket + ", message: " + message);
+            JsonValue jsonMessage = JsonValue.Parse(message);
+            String page = (string)jsonMessage["page"];
+            String operation;
+            switch (page)
+            {       
+                case "home":
+                    operation = (string)jsonMessage["operation"];
+                    if (operation == "mode")
+                    {
+                        training = false; //if on home page, we are not in training mode.
+                        //log.Debug("training is set to " + training);
+                    }
+                    break;
+                case "train":
+                    operation = (string)jsonMessage["operation"];
+                    switch (operation)
+                    {
+                        case "accept":
+                            String label = (string)jsonMessage["data"]["label"];
+                            addExercise(label);
+                            break;
+                        case "reject":
+                            log.Debug("length of obs sequences before rejecting " + observationSequences[0].Count());
+                            clearObservations();
+                            log.Debug("length of obs sequences before rejecting " + observationSequences[0].Count());
                             break;
                         case "train":
-                            operation = (string)jsonMessage["operation"];
-                            switch (operation)
-                            {
-                                case "accept":
-                                    String label = (string)jsonMessage["data"]["label"];
-                                    addExercise(label);
-                                    break;
-                                case "reject":
-                                    log.Debug("length of obs sequences before rejecting " + observationSequences[0].Count());
-                                    clearObservations();
-                                    log.Debug("length of obs sequences before rejecting " + observationSequences[0].Count());
-                                    break;
-                                case "train":
-                                    learnHmms();
-                                    break;
-                                case "mode":
-                                    training = true;
-                                    log.Debug("training is set to " + training);
-                                    break;
-                                case "labels":
-                                    if (avgFramesPerLabel_Training != null && avgFramesPerLabel_Training.Count() > 0)
-                                    {
-                                        List<String> labels = new List<string>(avgFramesPerLabel_Training.Keys);
-                                        String data = JsonConvert.SerializeObject(labels);
-                                        broadcastMessage(createJsonString(page, operation, data));
-                                    }                                    
-                                    break;
-                                default:
-                                    break;
-                            }
+                            learnHmms();
                             break;
-                        case "options":
-                            int hours = Convert.ToInt32((string)jsonMessage["data"]["hour"]);
-                            int minutes = Convert.ToInt32((string)jsonMessage["data"]["minute"]);
-                            DateTime now = DateTime.Now;
-                            alarmDateTime = new DateTime(now.Year, now.Month, now.Day, hours, minutes, 0);
-                            log.Debug("alarmDateTime set to " + alarmDateTime);
-                            setAlarm(alarmDateTime.TimeOfDay - now.TimeOfDay);
-                            log.Debug("setting alarm");
-                            
-                            String excsRecd = (string)jsonMessage["data"]["exc"];
-                            exercisesToMonitor = excsRecd.Split('|').ToList();
-                            log.Debug("exercisesToMonitor set to " + exercisesToMonitor);
+                        case "mode":
+                            training = true; //if on train page, we ARE in training mode
+                            //log.Debug("training is set to " + training);
+                            break;
+                        case "labels":
+                            if (avgFramesPerLabel_Training != null && avgFramesPerLabel_Training.Count() > 0)
+                            {
+                                List<String> labels = new List<string>(avgFramesPerLabel_Training.Keys);
+                                String data = JsonConvert.SerializeObject(labels);
+                                broadcastMessage(createJsonString(page, operation, data));
+                            }                                    
                             break;
                         default:
                             break;
                     }
-                };
-            });
+                    break;
+                case "options":
+                    int hours = Convert.ToInt32((string)jsonMessage["data"]["hour"]);
+                    int minutes = Convert.ToInt32((string)jsonMessage["data"]["minute"]);
+                    DateTime now = DateTime.Now;
+                    alarmDateTime = new DateTime(now.Year, now.Month, now.Day, hours, minutes, 0);
+                    log.Debug("alarmDateTime set to " + alarmDateTime);
+                    TimeSpan alarmGoesOffIn = alarmDateTime.TimeOfDay - now.TimeOfDay;
+                    log.Debug("alarm should go off in " + alarmGoesOffIn.Hours + " hours, " + alarmGoesOffIn.Minutes + " minutes, and " + alarmGoesOffIn.Seconds + " seconds");
+                    setAlarm(alarmGoesOffIn);
+                            
+                    String excsRecd = (string)jsonMessage["data"]["exc"];
+                    log.Debug("number of exercises in exercisesToMonitor list: " + exercisesToMonitor.Count());
+                    exercisesToMonitor = excsRecd.Split(Constants.DELIMETER).ToList();
+                    log.Debug("number of exercises in exercisesToMonitor list after receiving update from client: " + exercisesToMonitor.Count());
+                    break;
+                default:
+                    break;
+            }
+                
         }
 
         public static DateTime UnixTimeStampToDateTime(double unixTimeStamp)
@@ -349,7 +347,7 @@ namespace Kinect.Server
         /// </summary>
         /// <param name="skeleton"></param>
         /// <param name="jointPoints"></param>
-        private static void sendSkeletonAndExerciseData(Body skeleton, Dictionary<JointType, Point> jointPoints)
+        static void sendSkeletonAndExerciseData(Body skeleton, Dictionary<JointType, Point> jointPoints)
         {
             int frameCount = observationSequences.Count > 0 ? observationSequences[0].Count() : 0;
             double avgFramesForCurrExc = 0;
@@ -361,8 +359,17 @@ namespace Kinect.Server
             
                 }
             }
-            String json = JsonSerializerHomePage.SerializeHomePageData(skeleton, jointPoints, alarmRinging, avgFramesForCurrExc, frameCount, exercisesToMonitor);
+            String json = CustomJsonSerializer.SerializeHomePageData(skeleton, jointPoints, alarmRinging, avgFramesForCurrExc, frameCount, exercisesToMonitor);
             broadcastMessage(json);
+        }
+
+        /// <summary>
+        /// Send observation sequences to be animated on the front end canvas, after a user has done a training sample
+        /// </summary>
+        static void sendObservationSequences()
+        {
+            String data = CustomJsonSerializer.SerializeObservationSequences(observationSequences);
+            broadcastMessage(createJsonString("train", "animate", data));
         }
 
         /// <summary>
@@ -494,21 +501,26 @@ namespace Kinect.Server
                 switch (e.Result.Semantics.Value.ToString())
                 {
                     case "START":
-                        log.Info("START voice command received");
-                        startCapture();
+                        if (training) //only relevant while training
+                        {
+                            log.Info("START voice command received");
+                            startCapture();
+                        }
                         break;
 
                     case "STOP":
-                        log.Info("STOP voice command received");
                         if (training)
                         {
-                            stopCapture();  
-                        }
+                            log.Info("STOP voice command received");
+                            stopCapture();
+                            sendObservationSequences();
+                            
+                        }                                               
                         break;
                 }
             }
         }
-
+        
         static void InitializeHmms()
         {
             saveDirPath = new Uri(Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().CodeBase), Constants.TRAINING_DATA_DIR)).LocalPath;            
@@ -529,11 +541,11 @@ namespace Kinect.Server
             //if there are files in the saveDirPath, load all the files            
             if (Directory.GetFiles(saveDirPath, "*", SearchOption.TopDirectoryOnly).Length == filenames.Length){
                 loadDatabases();
-                log.Debug("loaded training data from all joints");
+                log.Debug("loaded training data from all joints from directory: " + saveDirPath);
             }
             else
             {
-                log.Warn("No files in " + saveDirPath + "! Have you trained yet?");
+                log.Warn("No files in " + saveDirPath + "! Are you not `trained` yet?");
             }
             
             exercisesToMonitor = new List<String>();
@@ -570,12 +582,12 @@ namespace Kinect.Server
         /// <summary>l
         /// Stop saving kinect frames. If training mode is on, simply keep the observations and wait for client to tell us what to do with is
         /// If testing, clear observations.
-        /// </summary>
+        /// </summary> 
         static void stopCapture()
         {
             log.Debug("Capture stopped");
             captureStarted = false;
-            if (!training){
+            if (!training){ //if training, dont clear observations right away - let user decide if they want to accept / reject it before clearing
                 clearObservations();
             }
         }
@@ -584,13 +596,12 @@ namespace Kinect.Server
         {
             if (exercisesToMonitor.Count > 0){
                 String currExc = exercisesToMonitor.ElementAt(0);               
-                log.Debug("Checking for exercise" +currExc+ "in the current sequence");
+                log.Debug("Checking for exercise " +currExc+ " in the current observation sequences");
                 if (exerciseFound(currExc))
                 {
-                    log.Debug(currExc + " found! Removing it from list of exercises to monitor. \n DO A DANCE NOW???");
+                    log.Debug(currExc + " found! Removing it from list of exercises to monitor.");
                     exercisesToMonitor.RemoveAt(0);
-                    stopCapture();
-                    //TODO: send acknoledgement to client?
+                    clearObservations();
                 }
             }
             else{
@@ -614,7 +625,7 @@ namespace Kinect.Server
             double frameCount = observationSequences[0].Count();
             double avgFrameCountForExc = avgFramesPerLabel_Training[exerciseToCheck] ;
             double frameDifference = avgFrameCountForExc - frameCount;
-            double frameThreshold = avgFrameCountForExc + Convert.ToInt32(avgFrameCountForExc * Constants.FRAME_THRESHOLD_PERCENT);
+            double frameThreshold = Convert.ToInt32(avgFrameCountForExc * Constants.FRAME_THRESHOLD_PERCENT);
             
             if (Math.Abs(frameDifference) > frameThreshold)
             {
@@ -626,7 +637,10 @@ namespace Kinect.Server
             }
             if (debugging)
             {
-                log.Debug("Frames DIfference is: " + frameDifference + ". avg grames for exercise: " + exerciseToCheck + " is: " + avgFrameCountForExc + ". Frames Threshold is " + frameThreshold);
+                log.Debug("Frames DIfference is: " + frameDifference + 
+                    ", avg frames for exercise: " + exerciseToCheck + " is: " + avgFrameCountForExc + 
+                    ", Frames Threshold is " + frameThreshold + 
+                    ", Frame Differ Count is: " + frameCount);
             }
             
             //prepare for hmm computations
@@ -682,16 +696,31 @@ namespace Kinect.Server
                 
         }
 
+        /// <summary>
+        /// Use training data to learn hmm models for all the joints
+        /// </summary>
         static void learnHmms(){
+            if (databases[0].Samples.Count <= 0)
+            {
+                log.Debug("no samples in the database, skipping hmm model learning and computations");
+                return;
+            }
             kinectSensor.Close();
             for (int i = 0; i < databases.Count; i++)
             {
                 hmms[i] = learnHMM(databases[i]);
                log.Debug("done learning hmm for joint: " + i + " : " + Enum.GetName(typeof(JointType), i)); 
             }
+            saveDatabasesToFiles();
             kinectSensor.Open();
         }
 
+        /// <summary>
+        /// learn Hmm model for samples in given database using Baum Welch unsupervised learning algorithm
+        /// then used the learned model to classify the training samples
+        /// </summary>
+        /// <param name="database"></param>
+        /// <returns></returns>
         static HiddenMarkovClassifier<MultivariateNormalDistribution> learnHMM(Database database)
         {
 
@@ -748,30 +777,34 @@ namespace Kinect.Server
             return hmm;
         }
 
+        /// <summary>
+        /// Add a training sample to the databases of samples for all joints
+        /// </summary>
+        /// <param name="label"></param>
         static void addExercise(String label)
-        {
-            
+        {            
             for (int i = 0; i < databases.Count; i++)
             {
                 databases[i].Add(observationSequences[i].ToArray(), label);               
             }
             avgFramesPerLabel_Training = databases[0].avgFramesPerLabel();
             clearObservations();
-            log.Debug("added exercises to databases and updated avgFramesPerLabel dict");
+            log.Debug("added sample for exercise: " + label + " to databases, updated avgFramesPerLabel dict, and clearing observations");
         }
 
         /// <summary>
         /// save training joint sample to files
+        /// done after learnHmms has been called
         /// </summary>
-        static void saveDatabases()
+        static void saveDatabasesToFiles()
         {            
             String path;
             for (int i = 0; i < databases.Count; i++)
             {                
                 path = Path.Combine(saveDirPath, Path.GetFileName(filenames[i]));
                 log.Debug("Saving database to path: " + path);
-                //using (var stream = File.OpenWrite(path))
-                using (var stream = File.Create(path))
+                using (var stream = File.OpenWrite(path))
+                //using (var stream = File.Create(path))
                     databases[i].Save(stream);
             }
         }
@@ -782,10 +815,9 @@ namespace Kinect.Server
         /// <param name="ts"></param>
         static void setAlarm(TimeSpan ts)
         {
-            log.Debug("setting alarm with timespan: " + ts + "timespan.totalseconds: " + ts.TotalSeconds + "timer is: " + timer);
+            log.Debug("setting alarm with timespan: " + ts + "which has " + ts.TotalHours + " of total hours and " + ts.TotalMinutes + " of total minutes");
             if (timer != null) timer.Dispose();
-            if (ts.TotalSeconds > 0) timer = new System.Threading.Timer(new System.Threading.TimerCallback(ringAlarm), null, ts, TimeSpan.FromHours(24));
-            log.Debug("timer" + timer + " timespan from hours " + "");
+            timer = new System.Threading.Timer(new System.Threading.TimerCallback(ringAlarm), null, ts, TimeSpan.FromHours(24));
         }
 
         /// <summary>
@@ -796,9 +828,9 @@ namespace Kinect.Server
         static void ringAlarm(object state)
         {
             log.Info("RING! RING!");
-            player.Play();
+            player.PlayLooping();
             alarmRinging = true;
-            startCapture();
+            startCapture(); //start monitoring for exercises now!
         }
     }
 }

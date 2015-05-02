@@ -60,6 +60,6 @@ namespace Kinect.Server
 
         public static int MIN_NUM_MATCHED_JOINTS = 5;
 
-        public static String DELIMETER = "||";
+        public static char DELIMETER = '|';
     }
 }

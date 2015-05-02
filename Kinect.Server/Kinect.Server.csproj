@@ -91,7 +91,7 @@
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
     <Compile Include="Sequence.cs" />
-    <Compile Include="JsonSerializer.cs" />
+    <Compile Include="CustomJsonSerializer.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

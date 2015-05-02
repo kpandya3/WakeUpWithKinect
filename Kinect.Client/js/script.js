@@ -3,6 +3,10 @@ var excRemaining = {};
 var excRemainingList = [];
 var socket;
 var selectize;
+var canvas;
+var context;
+var frameRate = 30; //30fps
+var animateTimeout;
 
 window.onload = function () {
 
@@ -225,8 +229,8 @@ window.onload = function () {
 
 
     var status = document.getElementById("status");
-    var canvas = document.getElementById("canvas");
-    var context = canvas.getContext("2d");
+    canvas = document.getElementById("canvas");
+    context = canvas.getContext("2d");
 
     if (!window.WebSocket) {
         status.innerHTML = "Your browser does not support web sockets!";
@@ -236,7 +240,7 @@ window.onload = function () {
     status.innerHTML = "Connecting to server...";
 
     // Initialize a new web socket.
-    socket = new WebSocket("ws://138.51.175.165:8185");
+    socket = new WebSocket("ws://127.0.0.1:8185");
 
     // Connection established.
     socket.onopen = function () {
@@ -261,8 +265,7 @@ window.onload = function () {
             var jobj = JSON.parse(event.data);
             switch (jobj.page) {
                 case "home":
-                    //clear canvas!
-                    context.clearRect(0, 0, canvas.width, canvas.height);
+                    clearCanvas();
                     var skeleton = jobj.data.skeleton;
                     // Display the skeleton joints.
                     for (var j = 0; j < skeleton.joints.length; j++) {
@@ -311,6 +314,10 @@ window.onload = function () {
                             selectize.addOption(tmp);
                             selectize.refreshOptions();
                             break;
+
+                        case "animate":
+                            animate(jobj.data);
+                            break;
                     }
                     break;
 
@@ -329,6 +336,7 @@ window.onload = function () {
 // TRAINING PAGE FUNCTIONS ******************************************
 
 function acceptTraining() {
+    clearTimeout(animateTimeout);
     socket.send(JSON.stringify({
         page: "train",
         operation: "accept",
@@ -339,6 +347,7 @@ function acceptTraining() {
 }
 
 function rejectTraining() {
+    clearTimeout(animateTimeout);
     socket.send(JSON.stringify({
         page: "train",
         operation: "reject",
@@ -347,9 +356,41 @@ function rejectTraining() {
 }
 
 function train() {
+    clearTimeout(animateTimeout);
     socket.send(JSON.stringify({
         page: "train",
         operation: "train",
         data: {}
     }));
+}
+
+function animate(obsSeqs) {
+    console.log(obsSeqs);
+    clearCanvas();
+
+    var seqs = obsSeqs.observationSequences;
+    var numJoints = seqs.length;
+    var numFrames = seqs[0].length;
+      
+    (function draw(i) {
+        animateTimeout = setTimeout(function () {
+            if (i <= numFrames) {
+                clearCanvas();
+                for (var j = 0; j < numJoints; j++) {
+                    context.strokeStyle = "#0000FF";
+                    context.fillStyle = "#0000FF";
+                    context.beginPath();
+                    context.arc(seqs[j][i].x, seqs[j][i].y, 2, 0, Math.PI * 2, true);
+                    context.stroke();
+                }
+                i++;
+                draw(i);
+            }
+        }, 1000/frameRate)
+    })(0);
+
+}
+
+function clearCanvas() {
+    context.clearRect(0, 0, canvas.width, canvas.height);
 }

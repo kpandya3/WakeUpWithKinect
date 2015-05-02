@@ -15,7 +15,7 @@ namespace Kinect.Server
     /// <summary>
     /// Serializes messages to clients to JSON fromat.
     /// </summary>
-    public static class JsonSerializerHomePage
+    public static class CustomJsonSerializer
     {
         #region protocol for home page - when alarm rings
         [DataContract]
@@ -40,10 +40,10 @@ namespace Kinect.Server
             [DataMember(Name = "alarmOn")]
             public Boolean AlarmOn { get; set; }
 
-            [DataMember(Name = "avgFrames")]
+            [DataMember(Name = "avgFrame")]
             public double AvgFrames { get; set; }
 
-            [DataMember(Name = "currFrames")]
+            [DataMember(Name = "curFrame")]
             public int CurrFrames { get; set; }
 
             [DataMember(Name = "excRemaining")]
@@ -73,6 +73,21 @@ namespace Kinect.Server
             public double Y { get; set; }
         }
         #endregion
+        
+        [DataContract]
+        class JSONObsSeqs
+        {
+            [DataMember(Name = "observationSequences")]
+            public List<List<Point>> obsSeq { get; set; }
+        }        
+
+        public static string SerializeObservationSequences(List<List<Point>> observationSequences){
+            JSONObsSeqs obsSeqs = new JSONObsSeqs
+            {
+                obsSeq = observationSequences
+            };
+            return Serialize(obsSeqs);
+        }
 
         public static string SerializeHomePageData(Body skeleton, Dictionary<JointType, Point> jointPoints, Boolean alarmOn, double avgFrames, int currFrames, List<String> excRemaining)
         {
