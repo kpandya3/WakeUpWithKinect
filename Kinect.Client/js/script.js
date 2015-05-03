@@ -335,19 +335,22 @@ window.onload = function () {
                     switch(jobj.operation)
                     {
                         case "labels":
-                            selectize.clearOptions();
                             var tmp = [];
                             var available = "";
-                            for (var i=0; i<jobj.data.length; i++){
-                                tmp.push({value:jobj.data[i], text:jobj.data[i]});
+                            for (var i = 0; i < jobj.data.length; i++) {
+                                tmp.push({ value: jobj.data[i], text: jobj.data[i] });
                                 available += jobj.data[i] + ", ";
                             }
-                            selectize.addOption(tmp);
-                            selectize.refreshOptions();
-                            if (available == "") {
-                                $('#optionsExeList').text("You have no Training samples!");
+                            if ($('.train.page').is(':visible')) {
+                                selectize.clearOptions();
+                                selectize.addOption(tmp);
+                                selectize.refreshOptions();
                             } else {
-                                $('#optionsExeList').text("Available: "+available.substr(0, available.length-2));                                
+                                if (available == "") {
+                                    $('#optionsExeList').text("You have no Training samples!");
+                                } else {
+                                    $('#optionsExeList').text("Available: " + available.substr(0, available.length - 2));
+                                }
                             }
                             break;
 
