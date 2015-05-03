@@ -3,6 +3,7 @@ var excRemaining = {};
 var excRemainingList = [];
 var socket;
 var selectize;
+var homeTimer;
 var canvas;
 var context;
 var frameRate = 30; //30fps
@@ -13,7 +14,6 @@ window.onload = function () {
     console.log("ready");
     $('body').find('.page.train').hide();
     $('body').find('.page.options').hide();
-
 
     // CLOCKPICKER ******************************************************
 
@@ -129,7 +129,7 @@ window.onload = function () {
 
         return timerObj;
     };
-    var homeTimer = new Timer("countdown", 5000, 50, function () { }, "red", "green");
+    homeTimer = new Timer("countdown", 5000, 50, function () { }, "red", "green");
     // TIMER END ********************************************************
 
     // SELECTIZE ********************************************************
@@ -144,7 +144,7 @@ window.onload = function () {
     });
 
     selectize = $select[0].selectize;
-    console.log(selectize);
+
     selectize.on('focus', function (e) {
         socket.send(JSON.stringify({
             page: "train",
@@ -174,6 +174,12 @@ window.onload = function () {
             socket.send(JSON.stringify({
                 page: "home",
                 operation: "mode",
+                data: {}
+            }));
+        } else {
+            socket.send(JSON.stringify({
+                page: "train",
+                operation: "labels",
                 data: {}
             }));
         }
@@ -240,7 +246,7 @@ window.onload = function () {
     status.innerHTML = "Connecting to server...";
 
     // Initialize a new web socket.
-    socket = new WebSocket("ws://127.0.0.1:8185");
+    socket = new WebSocket("ws://142.1.5.122:8185");
 
     // Connection established.
     socket.onopen = function () {
@@ -265,42 +271,63 @@ window.onload = function () {
             var jobj = JSON.parse(event.data);
             switch (jobj.page) {
                 case "home":
-                    clearCanvas();
-                    var skeleton = jobj.data.skeleton;
-                    // Display the skeleton joints.
-                    for (var j = 0; j < skeleton.joints.length; j++) {
-                        var joint = skeleton.joints[j];
-                        // Draw!!!
-                        context.strokeStyle = "#0000FF";
-                        context.fillStyle = "#0000FF";
-                        context.beginPath();
-                        context.arc(joint.x, joint.y, 2, 0, Math.PI * 2, true);
-                        context.stroke();
-                    }
-                    console.log(jobj.data.alarmOn);
-                    if (jobj.data.alarmOn) {
-                        homeTimer.draw(jobj.data.avgFrame, jobj.data.curFrame);
-                    } else {
-                        homeTimer.draw(jobj.data.avgFrame, jobj.data.curFrame);
-                    }
-                    if (JSON.stringify(jobj.data.excRemaining) != JSON.stringify(excRemainingList)) {
-                        excList = [];
-                        excRemaining = {};
-                        excRemainingList = jobj.data.excRemaining;
-                        jobj.data.excRemaining.map(function (a) {
-                            if (a in excRemaining) excRemaining[a]++;
-                            else {
-                                excRemaining[a] = 1;
-                                if (excList.indexOf(a) == -1) excList.push(a);
-                            }
-                        });
-                        $('#testExeTable').empty();
-                        for (var i = 0; i < excList.length; i++) {
-                            $('#testExeTable').append("<tr><td>" + excList[i] + "</td><td>" + excRemaining[excList[i]] + "</td></tr>");
-                        }
-                    }
-                    break;
+                    switch (jobj.operation) {
+                        case "default":
 
+                            //clear canvas!
+                            clearCanvas();
+
+                            var skeleton = jobj.data.skeleton;
+                            // Display the skeleton joints.
+                            for (var j = 0; j < skeleton.joints.length; j++) {
+                                var joint = skeleton.joints[j];
+                                // Draw!!!
+                                context.strokeStyle = "#0000FF";
+                                context.fillStyle = "#0000FF";
+                                context.beginPath();
+                                context.arc(joint.x, joint.y, 2, 0, Math.PI * 2, true);
+                                context.stroke();
+                            }
+                            if (jobj.data.alarmOn) {
+                                homeTimer.draw(parseInt(jobj.data.avgFrame), parseInt(jobj.data.curFrame));
+                            }
+                            if (JSON.stringify(jobj.data.excRemaining) != JSON.stringify(excRemainingList)) {
+                                excList = [];
+                                excRemaining = {};
+                                excRemainingList = jobj.data.excRemaining;
+                                jobj.data.excRemaining.map(function (a) {
+                                    if (a in excRemaining) {
+                                        excRemaining[a]++;
+                                    } else {
+                                        excRemaining[a] = 1;
+                                        if (excList.indexOf(a) == -1) excList.push(a);
+                                    }
+                                });
+                                $('#testExeTable').empty();
+                                for (var i = 0; i < excList.length; i++) {
+                                    $('#testExeTable').append("<tr><td>" + excList[i] + "</td><td>" + excRemaining[excList[i]] + "</td></tr>");
+                                }
+                                $($('#testExeTable').children('tr:first').children()[0]).effect("highlight", {}, 1000);
+                                $($('#testExeTable').children('tr:first').children()[1]).effect("highlight", {}, 1000);
+                            }
+                            break;
+
+                        case "notification":
+                            $.notifyBar({
+                                html: jobj.data,
+                                delay: 1000,
+                                animationSpeed: "normal",
+                                position: "bottom",
+                                cssClass: "success"
+                            });
+                            break;
+
+                        case "switch":
+                            // Default to home page
+                            if ($('.home.page').is(':visible') == false) {
+                                $('#navbar').find('a:contains("Home")').click();
+                            }
+                    }
 
 
                 case "train":
@@ -308,11 +335,15 @@ window.onload = function () {
                         case "labels":
                             selectize.clearOptions();
                             var tmp = [];
+                            var available = "";
                             for (var i = 0; i < jobj.data.length; i++) {
                                 tmp.push({ value: jobj.data[i], text: jobj.data[i] });
+                                available += jobj.data[i] + ",";
                             }
                             selectize.addOption(tmp);
                             selectize.refreshOptions();
+
+                            $('#optionsExeList').text("Available: " + available.substr(0, available.length - 1));
                             break;
 
                         case "animate":
@@ -320,8 +351,6 @@ window.onload = function () {
                             break;
                     }
                     break;
-
-
 
                 case "options":
                     break;
@@ -348,6 +377,7 @@ function acceptTraining() {
 
 function rejectTraining() {
     clearTimeout(animateTimeout);
+    clearCanvas();
     socket.send(JSON.stringify({
         page: "train",
         operation: "reject",
@@ -357,6 +387,7 @@ function rejectTraining() {
 
 function train() {
     clearTimeout(animateTimeout);
+    clearCanvas();
     socket.send(JSON.stringify({
         page: "train",
         operation: "train",
@@ -364,14 +395,23 @@ function train() {
     }));
 }
 
+function resetTraining() {
+    clearTimeout(animateTimeout);
+    clearCanvas();
+    socket.send(JSON.stringify({
+        page: "train",
+        operation: "reset",
+        data: {}
+    }));
+}
+
 function animate(obsSeqs) {
-    console.log(obsSeqs);
     clearCanvas();
 
     var seqs = obsSeqs.observationSequences;
     var numJoints = seqs.length;
     var numFrames = seqs[0].length;
-      
+
     (function draw(i) {
         animateTimeout = setTimeout(function () {
             if (i <= numFrames) {
@@ -386,7 +426,7 @@ function animate(obsSeqs) {
                 i++;
                 draw(i);
             }
-        }, 1000/frameRate)
+        }, 1000 / frameRate)
     })(0);
 
 }

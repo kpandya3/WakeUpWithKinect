@@ -56,10 +56,12 @@ namespace Kinect.Server
         /// <summary>
         /// percent of avg frames to use as threshold increment
         /// </summary>
-        public static double FRAME_THRESHOLD_PERCENT = 0.15;
+        public static double FRAME_THRESHOLD_PERCENT = 0.20;
 
         public static int MIN_NUM_MATCHED_JOINTS = 5;
 
         public static char DELIMETER = '|';
+
+        public static int NUM_INITIAL_FRAMES_TO_REMOVE = 10;
     }
 }

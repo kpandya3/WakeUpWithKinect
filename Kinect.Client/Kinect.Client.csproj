@@ -65,12 +65,10 @@
     <Reference Include="System.EnterpriseServices" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="css\bootstrap-clockpicker.min.css" />
     <Content Include="css\bootstrap-theme.min.css" />
     <Content Include="css\bootstrap.min.css" />
     <Content Include="index.html" />
     <Content Include="css\style.css" />
-    <Content Include="js\bootstrap-clockpicker.min.js" />
     <Content Include="js\bootstrap.min.js" />
     <Content Include="js\html5shiv.min.js" />
     <Content Include="js\jquery.min.js" />
@@ -86,9 +84,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="fonts\glyphicons-halflings-regular.woff2" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>

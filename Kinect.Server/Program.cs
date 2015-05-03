@@ -129,6 +129,7 @@ namespace Kinect.Server
             JsonValue jsonMessage = JsonValue.Parse(message);
             String page = (string)jsonMessage["page"];
             String operation;
+            String data;
             switch (page)
             {       
                 case "home":
@@ -146,24 +147,34 @@ namespace Kinect.Server
                         case "accept":
                             String label = (string)jsonMessage["data"]["label"];
                             addExercise(label);
+                            sendNotification("Training case for exercise : " + label + " added.");
+                            
                             break;
                         case "reject":
                             log.Debug("length of obs sequences before rejecting " + observationSequences[0].Count());
                             clearObservations();
+                            sendNotification("Training case rejected!");
                             log.Debug("length of obs sequences before rejecting " + observationSequences[0].Count());
+                            
                             break;
                         case "train":
+                            sendNotification("Training...");
                             learnHmms();
+                            sendNotification("Training finished!");
                             break;
                         case "mode":
                             training = true; //if on train page, we ARE in training mode
                             //log.Debug("training is set to " + training);
                             break;
+                        case "reset":
+                            resetTrainingData();
+                            sendNotification("Cleared all existing training cases");
+                            break;
                         case "labels":
                             if (avgFramesPerLabel_Training != null && avgFramesPerLabel_Training.Count() > 0)
                             {
                                 List<String> labels = new List<string>(avgFramesPerLabel_Training.Keys);
-                                String data = JsonConvert.SerializeObject(labels);
+                                data = JsonConvert.SerializeObject(labels);
                                 broadcastMessage(createJsonString(page, operation, data));
                             }                                    
                             break;
@@ -179,17 +190,34 @@ namespace Kinect.Server
                     log.Debug("alarmDateTime set to " + alarmDateTime);
                     TimeSpan alarmGoesOffIn = alarmDateTime.TimeOfDay - now.TimeOfDay;
                     log.Debug("alarm should go off in " + alarmGoesOffIn.Hours + " hours, " + alarmGoesOffIn.Minutes + " minutes, and " + alarmGoesOffIn.Seconds + " seconds");
-                    setAlarm(alarmGoesOffIn);
-                            
-                    String excsRecd = (string)jsonMessage["data"]["exc"];
-                    log.Debug("number of exercises in exercisesToMonitor list: " + exercisesToMonitor.Count());
-                    exercisesToMonitor = excsRecd.Split(Constants.DELIMETER).ToList();
-                    log.Debug("number of exercises in exercisesToMonitor list after receiving update from client: " + exercisesToMonitor.Count());
+                    if (setAlarm(alarmGoesOffIn))
+                    {
+                        String excsRecd = (string)jsonMessage["data"]["exc"];
+                        log.Debug("number of exercises in exercisesToMonitor list: " + exercisesToMonitor.Count());
+                        exercisesToMonitor = excsRecd.Split(Constants.DELIMETER).ToList();
+                        log.Debug("number of exercises in exercisesToMonitor list after receiving update from client: " + exercisesToMonitor.Count());
+                    }
                     break;
                 default:
                     break;
             }
                 
+        }
+
+        static void resetTrainingData()
+        {
+            if (Directory.Exists(saveDirPath))
+            {
+                Directory.Delete(saveDirPath, true);
+            }
+            
+            for (int i = 0; i < databases.Count();i++ )
+            {
+                databases[i].Clear();
+            }
+
+            clearObservations();
+            avgFramesPerLabel_Training.Clear();
         }
 
         public static DateTime UnixTimeStampToDateTime(double unixTimeStamp)
@@ -340,6 +368,19 @@ namespace Kinect.Server
         {
             alarmRinging = false;
             player.Stop();
+            stopCapture();
+            sendNotification("Good Morning! :D");
+        }
+
+        static void sendNotification(String notification)
+        {
+            sendBasicMessage("home", "notification", notification);
+        }
+
+        static void sendBasicMessage(String page, String operation, String message)
+        {
+            String data = JsonConvert.SerializeObject(message);
+            broadcastMessage(createJsonString(page, operation, data));
         }
 
         /// <summary>
@@ -562,10 +603,6 @@ namespace Kinect.Server
                 currFilePath = Path.Combine(saveDirPath, Path.GetFileName(filenames[i]));
                 databases[i].Load(new FileStream(currFilePath, FileMode.Open)); //load databases if training data already exists                
             }
-
-            //set average frames per label dictionary
-            avgFramesPerLabel_Training = databases[0].avgFramesPerLabel();
-
             //training data has been loaded, now learn the HMM models for each joint in training data
             learnHmms();
         }
@@ -625,9 +662,9 @@ namespace Kinect.Server
             double frameCount = observationSequences[0].Count();
             double avgFrameCountForExc = avgFramesPerLabel_Training[exerciseToCheck] ;
             double frameDifference = avgFrameCountForExc - frameCount;
-            double frameThreshold = Convert.ToInt32(avgFrameCountForExc * Constants.FRAME_THRESHOLD_PERCENT);
+            double frameDifferenceThreshold = Convert.ToInt32(avgFrameCountForExc * Constants.FRAME_THRESHOLD_PERCENT);
             
-            if (Math.Abs(frameDifference) > frameThreshold)
+            if (Math.Abs(frameDifference) > frameDifferenceThreshold)
             {
                 if (frameCount > avgFrameCountForExc)
                 {
@@ -639,7 +676,7 @@ namespace Kinect.Server
             {
                 log.Debug("Frames DIfference is: " + frameDifference + 
                     ", avg frames for exercise: " + exerciseToCheck + " is: " + avgFrameCountForExc + 
-                    ", Frames Threshold is " + frameThreshold + 
+                    ", Frames Threshold is " + frameDifferenceThreshold + 
                     ", Frame Differ Count is: " + frameCount);
             }
             
@@ -712,6 +749,10 @@ namespace Kinect.Server
                log.Debug("done learning hmm for joint: " + i + " : " + Enum.GetName(typeof(JointType), i)); 
             }
             saveDatabasesToFiles();
+
+            //set average frames per label dictionary
+            avgFramesPerLabel_Training = databases[0].avgFramesPerLabel();
+
             kinectSensor.Open();
         }
 
@@ -776,13 +817,25 @@ namespace Kinect.Server
 
             return hmm;
         }
+        
+        /// <summary>
+        /// Remove initial num of frames from current training sample that is being added to databases
+        /// </summary>
+        static void removeInitialFramesFromTrainingSamples()
+        {
+            for (int i = 0; i < numJoints; i++)
+            {
+                observationSequences[i].RemoveRange(0, Constants.NUM_INITIAL_FRAMES_TO_REMOVE);
+            }
+        }
 
         /// <summary>
         /// Add a training sample to the databases of samples for all joints
         /// </summary>
         /// <param name="label"></param>
         static void addExercise(String label)
-        {            
+        {
+            removeInitialFramesFromTrainingSamples();
             for (int i = 0; i < databases.Count; i++)
             {
                 databases[i].Add(observationSequences[i].ToArray(), label);               
@@ -797,7 +850,8 @@ namespace Kinect.Server
         /// done after learnHmms has been called
         /// </summary>
         static void saveDatabasesToFiles()
-        {            
+        {
+            Directory.CreateDirectory(saveDirPath); //create dir if it doesn't already exist
             String path;
             for (int i = 0; i < databases.Count; i++)
             {                
@@ -813,11 +867,23 @@ namespace Kinect.Server
         /// Set Timer based on timespan parameter
         /// </summary>
         /// <param name="ts"></param>
-        static void setAlarm(TimeSpan ts)
+        static Boolean setAlarm(TimeSpan ts)
         {
             log.Debug("setting alarm with timespan: " + ts + "which has " + ts.TotalHours + " of total hours and " + ts.TotalMinutes + " of total minutes");
             if (timer != null) timer.Dispose();
-            timer = new System.Threading.Timer(new System.Threading.TimerCallback(ringAlarm), null, ts, TimeSpan.FromHours(24));
+            if (ts.Seconds <= 0)
+            {
+                sendNotification("Y u no send me proper alarm time?");
+                return false;
+            }
+            else
+            {
+                timer = new System.Threading.Timer(new System.Threading.TimerCallback(ringAlarm), null, ts, TimeSpan.FromHours(24));
+                sendNotification("Settings set successfully");
+                
+                return true;
+            }
+            
         }
 
         /// <summary>
@@ -827,6 +893,7 @@ namespace Kinect.Server
         /// <param name="state"></param>
         static void ringAlarm(object state)
         {
+            sendBasicMessage("home", "switch", "");
             log.Info("RING! RING!");
             player.PlayLooping();
             alarmRinging = true;
