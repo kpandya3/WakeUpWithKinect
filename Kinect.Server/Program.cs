@@ -217,7 +217,11 @@ namespace Kinect.Server
             }
 
             clearObservations();
-            avgFramesPerLabel_Training.Clear();
+            if (avgFramesPerLabel_Training != null)
+            {
+                avgFramesPerLabel_Training.Clear();
+            }
+            
         }
 
         public static DateTime UnixTimeStampToDateTime(double unixTimeStamp)

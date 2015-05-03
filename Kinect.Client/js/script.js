@@ -15,9 +15,9 @@ window.onload = function () {
     $('body').find('.page.train').hide();
     $('body').find('.page.options').hide();
 
-    // CLOCKPICKER ******************************************************
+// CLOCKPICKER ******************************************************
 
-    $('.clockpicker').clockpicker().find('input').change(function () {
+    $('.clockpicker').clockpicker().find('input').change(function(){
         // TODO: time changed
         // var time = this.value.split(":");
         // var cd = new Date();
@@ -30,12 +30,12 @@ window.onload = function () {
     });
 
 
-    // CLOCKPICKER END **************************************************
+// CLOCKPICKER END **************************************************
 
 
-    // TIMER ************************************************************
+// TIMER ************************************************************
 
-    var Timer = function (canvasId, timeMax, refreshRate, timeoutCallback, strokeColor, fillColor) {
+    var Timer = function(canvasId, timeMax, refreshRate, timeoutCallback, strokeColor, fillColor) {
         var canvas = document.getElementById(canvasId),
             ctx = canvas.getContext("2d"),
             cwidth = canvas.width,
@@ -53,12 +53,12 @@ window.onload = function () {
             arcNorth = Math.PI * -0.5,
             stepTimer = null;
 
-        var redrawInitials = function () {
+        var redrawInitials = function() {
             // lazy def
             ctx.strokeStyle = strokeColor;
             ctx.fillStyle = fillColor;
             ctx.lineWidth = .5;
-            redrawInitials = function () {
+            redrawInitials = function() {
                 ctx.clearRect(0, 0, cwidth, cheight);
                 ctx.beginPath();
                 ctx.arc(middleX, middleY, maxRadius, 0, radianMax, false);
@@ -68,7 +68,7 @@ window.onload = function () {
             return redrawInitials;
         }
 
-        var proceed = function () {
+        var proceed = function() {
             var newTimeLeft = timeLeft - refreshRate
             timerObj.setTimeLeft(newTimeLeft) && drawTimestep();
             if (newTimeLeft < 0) {
@@ -77,9 +77,9 @@ window.onload = function () {
                     timeoutCallback.call(null, newTimeLeft);
                 }
             }
-        }
+        }       
 
-        var drawTimestep = function () {
+        var drawTimestep = function() {
             var timeUsedPercent = (timeMax - timeLeft) / timeMax;
             var rmax = radianMax * timeUsedPercent;
             ctx.beginPath();
@@ -88,7 +88,7 @@ window.onload = function () {
             ctx.fill();
         }
 
-        var drawTimestep2 = function (total, used) {
+        var drawTimestep2 = function(total, used) {
             var timeUsedPercent = used / total;
             var rmax = radianMax * timeUsedPercent;
 
@@ -101,7 +101,7 @@ window.onload = function () {
         }
 
         var timerObj = {
-            setTimeLeft: function (time) {
+            setTimeLeft: function(time) {
                 if (time > timeMax) {
                     return false;
                 } else if (time > timeLeft) redrawInitials();
@@ -109,30 +109,30 @@ window.onload = function () {
                 return true;
             },
 
-            start: function () {
+            start: function() {
                 stepTimer = setInterval(proceed, refreshRate);
             },
 
-            draw: function (total, used) {
+            draw: function(total, used) {
                 drawTimestep2(total, used);
             },
 
-            stop: function () {
+            stop: function() {
                 clearInterval(stepTimer);
             }
         };
 
-        var init = (function () {
+        var init = (function() {
             redrawInitials();
             timerObj.setTimeLeft(timeMax);
         })()
 
         return timerObj;
     };
-    homeTimer = new Timer("countdown", 5000, 50, function () { }, "red", "green");
-    // TIMER END ********************************************************
+    homeTimer = new Timer("countdown", 5000, 50, function() { }, "red", "green");
+// TIMER END ********************************************************
 
-    // SELECTIZE ********************************************************
+// SELECTIZE ********************************************************
 
     var $select = $('#select-label').selectize({
         create: true,
@@ -145,7 +145,7 @@ window.onload = function () {
 
     selectize = $select[0].selectize;
 
-    selectize.on('focus', function (e) {
+    selectize.on('focus', function(e){
         socket.send(JSON.stringify({
             page: "train",
             operation: "labels",
@@ -154,27 +154,27 @@ window.onload = function () {
 
     });
 
-    // SELECTIZE END ****************************************************
-    // TAB SWITCH MODE **************************************************
-    $('li.gototab').click(function (e) {
+// SELECTIZE END ****************************************************
+// TAB SWITCH MODE **************************************************
+    $('li.gototab').click(function(e) {
         $(e.target).parent().parent().find('li.active').removeClass('active');
         $(e.target).parent().addClass('active');
         var target = $(e.target).text().toLowerCase();
         $('body').find('.page').hide();
-        $('body').find('.page.' + target).show();
+        $('body').find('.page.'+target).show();
         if (target == 'train') {
             $("#canvas").detach().appendTo('#trainCanvas');
             socket.send(JSON.stringify({
                 page: "train",
                 operation: "mode",
-                data: {}
+                data: { }
             }));
         } else if (target == 'home') {
             $("#canvas").detach().appendTo('#testCanvas');
             socket.send(JSON.stringify({
                 page: "home",
                 operation: "mode",
-                data: {}
+                data: { }
             }));
         } else {
             socket.send(JSON.stringify({
@@ -184,23 +184,24 @@ window.onload = function () {
             }));
         }
     });
-    // TAB SWITCH MODE **************************************************
+// TAB SWITCH MODE **************************************************
 
-    // OPTIONS TABLE ****************************************************
-    var rowCount = 1;
-    $("#add_row").click(function () {
-        $('#addr' + rowCount).html("<td><input name='exe" + rowCount + "' type='text' placeholder='Exercise' class='form-control input-md'  /> </td><td><input  name='count" + rowCount + "' type='text' placeholder='Count'  class='form-control input-md'></td>");
+// OPTIONS TABLE ****************************************************
+    var rowCount=1;
+    $("#add_row").click(function(){
+        $('#addr'+rowCount).html("<td><input name='exe"+rowCount+"' type='text' placeholder='Exercise' class='form-control input-md'  /> </td><td><input  name='count"+rowCount+"' type='text' placeholder='Count'  class='form-control input-md'></td>");
 
-        $('#tab_logic').append('<tr id="addr' + (rowCount + 1) + '"></tr>');
-        rowCount++;
+        $('#tab_logic').append('<tr id="addr'+(rowCount+1)+'"></tr>');
+        rowCount++; 
     });
-    $("#delete_row").click(function () {
-        if (rowCount > 1) {
-            $("#addr" + (rowCount - 1)).html('');
+    $("#delete_row").click(function(){
+        if(rowCount>1){
+            $("#addr"+(rowCount-1)).html('');
             rowCount--;
         }
     });
-    $("#save_settings").click(function () {
+    $("#save_settings").click(function(){
+        $('#alarmLabel').show();
         $('#timeLeft').text($('.clockpicker').clockpicker().find('input').val());
         var time = $('.clockpicker').clockpicker().find('input').val().split(":");
         var cd = new Date();
@@ -210,17 +211,16 @@ window.onload = function () {
         var e, c;
         $('#testExeTable').empty();
         for (var i = 0; i < rowCount; i++) {
-            e = $("input[name='exe" + i + "']").val();
-            c = $("input[name='count" + i + "']").val();
-            $('#testExeTable').append("<tr><td>" + e + "</td><td>" + c + "</td></tr>");
+            e = $("input[name='exe"+i+"']").val();
+            c = $("input[name='count"+i+"']").val();
+            $('#testExeTable').append("<tr><td>"+e+"</td><td>"+c+"</td></tr>");
 
-            for (var j = 0; j < parseInt(c) ; j++) {
-                exercises += e;
-                exercises += "|";
+            for (var j=0; j<parseInt(c); j++) {
+                exercises+= e;
+                exercises+= "|";
             }
         };
-        exercises = exercises.substr(0, exercises.length - 1);
-        console.log(exercises);
+        exercises = exercises.substr(0, exercises.length-1);
         socket.send(JSON.stringify({
             page: "options",
             operation: "setdt",
@@ -231,12 +231,12 @@ window.onload = function () {
             }
         }));
     });
-    // OPTIONS TABLE ****************************************************
+// OPTIONS TABLE ****************************************************
 
 
     var status = document.getElementById("status");
     canvas = document.getElementById("canvas");
-    context = canvas.getContext("2d");
+    context = canvas.getContext("2d");    
 
     if (!window.WebSocket) {
         status.innerHTML = "Your browser does not support web sockets!";
@@ -254,7 +254,7 @@ window.onload = function () {
         socket.send(JSON.stringify({
             page: "home",
             operation: "mode",
-            data: {}
+            data: { }
         }));
     };
 
@@ -269,9 +269,9 @@ window.onload = function () {
 
             // Get the data in JSON format.
             var jobj = JSON.parse(event.data);
-            switch (jobj.page) {
+            switch(jobj.page) {
                 case "home":
-                    switch (jobj.operation) {
+                    switch(jobj.operation){
                         case "default":
 
                             //clear canvas!
@@ -280,7 +280,7 @@ window.onload = function () {
                             var skeleton = jobj.data.skeleton;
                             // Display the skeleton joints.
                             for (var j = 0; j < skeleton.joints.length; j++) {
-                                var joint = skeleton.joints[j];
+                                var joint = skeleton.joints[j];                    
                                 // Draw!!!
                                 context.strokeStyle = "#0000FF";
                                 context.fillStyle = "#0000FF";
@@ -291,13 +291,13 @@ window.onload = function () {
                             if (jobj.data.alarmOn) {
                                 homeTimer.draw(parseInt(jobj.data.avgFrame), parseInt(jobj.data.curFrame));
                             }
-                            if (JSON.stringify(jobj.data.excRemaining) != JSON.stringify(excRemainingList)) {
+                            if (JSON.stringify(jobj.data.excRemaining) != JSON.stringify(excRemainingList) ) {
                                 excList = [];
                                 excRemaining = {};
                                 excRemainingList = jobj.data.excRemaining;
-                                jobj.data.excRemaining.map(function (a) {
-                                    if (a in excRemaining) {
-                                        excRemaining[a]++;
+                                jobj.data.excRemaining.map( function (a) {
+                                    if (a in excRemaining){
+                                        excRemaining[a] ++;
                                     } else {
                                         excRemaining[a] = 1;
                                         if (excList.indexOf(a) == -1) excList.push(a);
@@ -305,7 +305,7 @@ window.onload = function () {
                                 });
                                 $('#testExeTable').empty();
                                 for (var i = 0; i < excList.length; i++) {
-                                    $('#testExeTable').append("<tr><td>" + excList[i] + "</td><td>" + excRemaining[excList[i]] + "</td></tr>");
+                                    $('#testExeTable').append("<tr><td>"+excList[i]+"</td><td>"+excRemaining[excList[i]]+"</td></tr>");
                                 }
                                 $($('#testExeTable').children('tr:first').children()[0]).effect("highlight", {}, 1000);
                                 $($('#testExeTable').children('tr:first').children()[1]).effect("highlight", {}, 1000);
@@ -324,26 +324,31 @@ window.onload = function () {
 
                         case "switch":
                             // Default to home page
-                            if ($('.home.page').is(':visible') == false) {
+                            $('#alarmLabel').hide();
+                            if ($('.home.page').is(':visible') == false){
                                 $('#navbar').find('a:contains("Home")').click();
                             }
                     }
 
 
                 case "train":
-                    switch (jobj.operation) {
+                    switch(jobj.operation)
+                    {
                         case "labels":
                             selectize.clearOptions();
                             var tmp = [];
                             var available = "";
-                            for (var i = 0; i < jobj.data.length; i++) {
-                                tmp.push({ value: jobj.data[i], text: jobj.data[i] });
-                                available += jobj.data[i] + ",";
+                            for (var i=0; i<jobj.data.length; i++){
+                                tmp.push({value:jobj.data[i], text:jobj.data[i]});
+                                available += jobj.data[i] + ", ";
                             }
                             selectize.addOption(tmp);
                             selectize.refreshOptions();
-
-                            $('#optionsExeList').text("Available: " + available.substr(0, available.length - 1));
+                            if (available == "") {
+                                $('#optionsExeList').text("You have no Training samples!");
+                            } else {
+                                $('#optionsExeList').text("Available: "+available.substr(0, available.length-2));                                
+                            }
                             break;
 
                         case "animate":
@@ -365,6 +370,7 @@ window.onload = function () {
 // TRAINING PAGE FUNCTIONS ******************************************
 
 function acceptTraining() {
+    clearCanvas();
     clearTimeout(animateTimeout);
     socket.send(JSON.stringify({
         page: "train",
@@ -376,42 +382,42 @@ function acceptTraining() {
 }
 
 function rejectTraining() {
-    clearTimeout(animateTimeout);
     clearCanvas();
+    clearTimeout(animateTimeout);
     socket.send(JSON.stringify({
         page: "train",
         operation: "reject",
-        data: {}
+        data: { }
     }));
 }
 
 function train() {
-    clearTimeout(animateTimeout);
     clearCanvas();
+    clearTimeout(animateTimeout);
     socket.send(JSON.stringify({
         page: "train",
         operation: "train",
-        data: {}
+        data: { }
     }));
 }
 
 function resetTraining() {
-    clearTimeout(animateTimeout);
     clearCanvas();
+    clearTimeout(animateTimeout);
     socket.send(JSON.stringify({
         page: "train",
         operation: "reset",
-        data: {}
+        data: { }
     }));
 }
 
 function animate(obsSeqs) {
     clearCanvas();
-
+ 
     var seqs = obsSeqs.observationSequences;
     var numJoints = seqs.length;
     var numFrames = seqs[0].length;
-
+     
     (function draw(i) {
         animateTimeout = setTimeout(function () {
             if (i <= numFrames) {
@@ -426,11 +432,12 @@ function animate(obsSeqs) {
                 i++;
                 draw(i);
             }
-        }, 1000 / frameRate)
+        }, 1000/frameRate)
     })(0);
-
+ 
 }
-
+ 
 function clearCanvas() {
     context.clearRect(0, 0, canvas.width, canvas.height);
 }
+

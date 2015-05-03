@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
-    <title>Kinect &amp; HTML5</title>
+    <title>Wake up with Kinect</title>
     <link rel="stylesheet" href="css/style.css" />
     <!-- Bootstrap -->
     <link href="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" rel="stylesheet">
@@ -66,22 +66,12 @@
     <!-- HOME PAGE -->
     <div class="container home page">
         <div class="row">
-            <div class="col-lg-1 col-md-1 col-sm-1">
-            </div>
             <div class="col-lg-10 col-md-10 col-sm-10">
-                <h1>Kinect &amp HTML5 WebSockets</h1>
+                <h1>Wake up with Kinect</h1>
                 Status: <label id="status">None</label>
+                <h3 id="alarmLabel">Alarm will go off at <span id="timeLeft">--:--</span></h3>
             </div>
-            <div class="col-lg-1 col-md-1 col-sm-1">
-            </div>
-        </div>
-        <div class="row">
-            <div class="col-lg-1 col-md-1 col-sm-1">
-            </div>
-            <div class="col-lg-10 col-md-10 col-sm-10">
-                <h3>Alarm will go off at <span id="timeLeft">0:00</span></h3>
-            </div>
-            <div class="col-lg-1 col-md-1 col-sm-1">
+            <div class="col-lg-2 col-md-2 col-sm-2">
             </div>
         </div>
         <div class="row">
@@ -121,7 +111,20 @@
     <!-- TRAIN PAGE -->
     <div class="container train page">
         <!-- <div class="row" style="padding:30px;"></div> -->
-        <h3>Instructions</h3>
+        <div class="row">
+            <div class="col-lg-10 col-md-10 col-sm-10">
+                <h3>Instructions</h3>
+                <ul>
+                    <li>Say "START" to begin capture and "STOP" to end capture</li>
+                    <li>Observe the captured animation</li>
+                    <li>Accept the sample with a corresponding label if it looks correct, otherwise Reject</li>
+                    <li>Once there are sufficient samples, click "Train"</li>
+                    <li>Click "Reset" to clear the database and restart the training process</li>
+                </ul>
+            </div>
+            <div class="col-lg-2 col-md-2 col-sm-2">
+            </div>
+        </div>
         <div class="row">
             <div class="col-lg-8 col-md-8 col-sm-12" id="testCanvas">
                 <div id="trainCanvas"></div>
@@ -132,15 +135,15 @@
                     <select id="select-label" class="demo-default" placeholder="Select an Exercise..."></select>
                 </div>
                 <div class="row">
-                    <div class="col-lg-4 col-md-4 col-sm-4">
+                    <div class="col-lg-6 col-md-6 col-sm-6" style="padding-right: 0px;">
                         <button type="button" class="btn btn-default" onclick="acceptTraining();">
-                            <span class="glyphicon glyphicon-ok" aria-hidden="true"></span>
+                            <span class="glyphicon glyphicon-ok" aria-hidden="true"></span> Accept
                         </button>
                         <button type="button" class="btn btn-default" onclick="rejectTraining();">
-                            <span class="glyphicon glyphicon-remove" aria-hidden="true"></span>
+                            <span class="glyphicon glyphicon-remove" aria-hidden="true"></span> Reject
                         </button>
                     </div>
-                    <div class="col-lg-8 col-md-8 col-sm-8">
+                    <div class="col-lg-6 col-md-6 col-sm-6">
                         <button type="button" class="btn btn-default" onclick="train();">
                             <span class="glyphicon glyphicon-record" aria-hidden="true"></span> Train
                         </button>
@@ -166,7 +169,7 @@
             <div class="col-lg-2 col-md-0 col-sm-0"></div>
             <div class="col-lg-8 col-md-12 col-sm-12">
                 <div class="input-group clockpicker" data-placement="right" data-align="top" data-autoclose="true">
-                    <input type="text" class="form-control" value="09:32">
+                    <input type="text" class="form-control" value="10:10">
                     <span class="input-group-addon">
                         <span class="glyphicon glyphicon-time"></span>
                     </span>
@@ -177,7 +180,7 @@
         <div class="row" style="padding:10px;">
             <div class="col-lg-2 col-md-0 col-sm-0"></div>
             <div class="col-lg-8 col-md-12 col-sm-12">
-                <span class="label label-info" id="optionsExeList">Available: </span>
+                <span class="label label-info" id="optionsExeList">You have no Training samples!</span>
             </div>
             <div class="col-lg-2 col-md-0 col-sm-0"></div>
         </div>
