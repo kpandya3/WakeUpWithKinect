@@ -14,27 +14,6 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Accord.Statistics", "Accord.NET projects\Accord.Statistics\Accord.Statistics.csproj", "{FD8101DD-C95D-42D6-AD44-AE01C25F2811}"
 EndProject
 Global
-	GlobalSection(TeamFoundationVersionControl) = preSolution
-		SccNumberOfProjects = 6
-		SccEnterpriseProvider = {4CA58AB2-18FA-4F8D-95D4-32DDF27D184C}
-		SccTeamFoundationServer = https://cslinux.visualstudio.com/defaultcollection
-		SccLocalPath0 = .
-		SccProjectUniqueName1 = Accord.NET\u0020projects\\Accord.Core\\Accord.Core.csproj
-		SccProjectName1 = Accord.NET\u0020projects/Accord.Core
-		SccLocalPath1 = Accord.NET\u0020projects\\Accord.Core
-		SccProjectUniqueName2 = Accord.NET\u0020projects\\Accord.Math\\Accord.Math.csproj
-		SccProjectName2 = Accord.NET\u0020projects/Accord.Math
-		SccLocalPath2 = Accord.NET\u0020projects\\Accord.Math
-		SccProjectUniqueName3 = Accord.NET\u0020projects\\Accord.Statistics\\Accord.Statistics.csproj
-		SccProjectName3 = Accord.NET\u0020projects/Accord.Statistics
-		SccLocalPath3 = Accord.NET\u0020projects\\Accord.Statistics
-		SccProjectUniqueName4 = Kinect.Client\\Kinect.Client.csproj
-		SccProjectName4 = Kinect.Client
-		SccLocalPath4 = Kinect.Client
-		SccProjectUniqueName5 = Kinect.Server\\Kinect.Server.csproj
-		SccProjectName5 = Kinect.Server
-		SccLocalPath5 = Kinect.Server
-	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Debug|Mixed Platforms = Debug|Mixed Platforms
