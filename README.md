@@ -1,4 +1,4 @@
-keUpWithKinect
+# WakeUpWithKinect
 CSC492 - Machine learning with Kinect
 
 ## Inspiration
